@@ -36,7 +36,6 @@ struct CostSummaryRowView: View {
     }
 }
 
-@MainActor
 struct CostDetailsPanelView: View {
     static let panelWidth: CGFloat = 272
 
@@ -66,10 +65,6 @@ struct CostDetailsPanelView: View {
             }
     }
 
-    private var maxCost: Double {
-        max(points.map(\.costUSD).max() ?? 0, 0.01)
-    }
-
     private var selectedPoint: Point? {
         guard let selectedID else { return nil }
         return points.first(where: { $0.id == selectedID })
@@ -77,9 +72,6 @@ struct CostDetailsPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Cost Details")
-                .font(.system(size: 13, weight: .semibold))
-
             metricRow(title: "Today", cost: summary.todayCostUSD, tokens: summary.todayTokens)
             metricRow(title: "Last 30 Days", cost: summary.last30DaysCostUSD, tokens: summary.last30DaysTokens)
             metricRow(title: "All-Time", cost: summary.lifetimeCostUSD, tokens: summary.lifetimeTokens)
@@ -152,7 +144,7 @@ struct CostDetailsPanelView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .frame(
             width: Self.panelWidth,

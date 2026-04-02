@@ -1,13 +1,13 @@
 import Foundation
 
-struct DailyCostEntry: Identifiable {
+struct DailyCostEntry: Identifiable, Codable {
     let id: String
     let date: Date
     let costUSD: Double
     let totalTokens: Int
 }
 
-struct LocalCostSummary {
+struct LocalCostSummary: Codable {
     var todayCostUSD: Double
     var todayTokens: Int
     var last30DaysCostUSD: Double

@@ -16,16 +16,8 @@ final class SessionLogStore {
         let usage: Usage
     }
 
-    struct ActivationRecord {
-        let timestamp: Date
-        let providerId: String?
-        let accountId: String?
-    }
-
     struct Snapshot {
         let sessions: [SessionRecord]
-        let activations: [ActivationRecord]
-        let updatedAt: Date
     }
 
     private struct FileFingerprint: Equatable {
@@ -38,16 +30,10 @@ final class SessionLogStore {
         let record: SessionRecord?
     }
 
-    private struct CachedActivationRecords {
-        let fingerprint: FileFingerprint
-        let records: [ActivationRecord]
-    }
-
     private let queue = DispatchQueue(label: "lzl.codexbar.session-log-store", qos: .utility)
     private let snapshotReuseWindow: TimeInterval = 2
 
     private var sessionCache: [URL: CachedSessionRecord] = [:]
-    private var activationCache: CachedActivationRecords?
     private var cachedSnapshot: Snapshot?
     private var cachedSnapshotAt: Date?
 
@@ -62,14 +48,14 @@ final class SessionLogStore {
                 return cachedSnapshot
             }
 
-            let snapshot = self.buildSnapshot(now: now)
+            let snapshot = self.buildSnapshot()
             self.cachedSnapshot = snapshot
             self.cachedSnapshotAt = now
             return snapshot
         }
     }
 
-    private func buildSnapshot(now: Date) -> Snapshot {
+    private func buildSnapshot() -> Snapshot {
         let files = self.sessionFiles()
         var nextSessionCache: [URL: CachedSessionRecord] = [:]
         var sessions: [SessionRecord] = []
@@ -95,8 +81,7 @@ final class SessionLogStore {
 
         self.sessionCache = nextSessionCache
 
-        let activations = self.loadActivations()
-        return Snapshot(sessions: sessions, activations: activations, updatedAt: now)
+        return Snapshot(sessions: sessions)
     }
 
     private func sessionFiles() -> [URL] {
@@ -179,37 +164,6 @@ final class SessionLogStore {
             model: resolvedModel,
             usage: usage
         )
-    }
-
-    private func loadActivations() -> [ActivationRecord] {
-        guard let fingerprint = self.fingerprint(for: CodexPaths.switchJournalURL) else {
-            self.activationCache = nil
-            return []
-        }
-
-        if let activationCache = self.activationCache, activationCache.fingerprint == fingerprint {
-            return activationCache.records
-        }
-
-        var records: [ActivationRecord] = []
-        _ = self.enumerateLines(in: CodexPaths.switchJournalURL) { line in
-            guard let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let timestampString = json["timestamp"] as? String,
-                  let timestamp = ISO8601Parsing.parse(timestampString) else { return }
-
-            records.append(
-                ActivationRecord(
-                    timestamp: timestamp,
-                    providerId: json["providerId"] as? String,
-                    accountId: json["accountId"] as? String
-                )
-            )
-        }
-
-        records.sort { $0.timestamp < $1.timestamp }
-        self.activationCache = CachedActivationRecords(fingerprint: fingerprint, records: records)
-        return records
     }
 
     private func enumerateLines(in fileURL: URL, handleLine: (String) -> Void) -> Bool {

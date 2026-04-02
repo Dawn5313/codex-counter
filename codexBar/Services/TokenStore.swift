@@ -7,12 +7,12 @@ final class TokenStore: ObservableObject {
     @Published var accounts: [TokenAccount] = []
     @Published private(set) var config: CodexBarConfig
     @Published private(set) var localCostSummary: LocalCostSummary = .empty
-    @Published private(set) var billingHistory: BillingHistory = .empty
 
     private let configStore = CodexBarConfigStore()
     private let syncService = CodexSyncService()
     private let costSummaryService = LocalCostSummaryService()
-    private let billingHistoryService = BillingHistoryService()
+    private let refreshStateQueue = DispatchQueue(label: "lzl.codexbar.refresh-state")
+    private var isRefreshingLocalCostSummary = false
 
     private init() {
         if let loaded = try? self.configStore.loadOrMigrate() {
@@ -22,6 +22,7 @@ final class TokenStore: ObservableObject {
         }
 
         self.publishState()
+        self.localCostSummary = self.loadCachedLocalCostSummary()
         self.seedSwitchJournalIfNeeded()
         try? self.syncService.synchronize(config: self.config)
     }
@@ -46,8 +47,7 @@ final class TokenStore: ObservableObject {
         if let loaded = try? self.configStore.loadOrMigrate() {
             self.config = loaded
             self.publishState()
-            self.refreshLocalCostSummary()
-            self.refreshBillingHistory()
+            self.localCostSummary = self.loadCachedLocalCostSummary()
         }
     }
 
@@ -298,21 +298,21 @@ final class TokenStore: ObservableObject {
 
     func refreshLocalCostSummary() {
         let service = self.costSummaryService
+        let shouldStart = self.refreshStateQueue.sync { () -> Bool in
+            guard self.isRefreshingLocalCostSummary == false else { return false }
+            self.isRefreshingLocalCostSummary = true
+            return true
+        }
+        guard shouldStart else { return }
+
         DispatchQueue.global(qos: .utility).async {
             let summary = service.load()
             DispatchQueue.main.async {
                 self.localCostSummary = summary
-            }
-        }
-    }
-
-    func refreshBillingHistory() {
-        let service = self.billingHistoryService
-        let config = self.config
-        DispatchQueue.global(qos: .utility).async {
-            let history = service.load(config: config)
-            DispatchQueue.main.async {
-                self.billingHistory = history
+                self.saveCachedLocalCostSummary(summary)
+                self.refreshStateQueue.async {
+                    self.isRefreshingLocalCostSummary = false
+                }
             }
         }
     }
@@ -343,6 +343,25 @@ final class TokenStore: ObservableObject {
         guard FileManager.default.fileExists(atPath: CodexPaths.switchJournalURL.path) == false,
               self.config.active.providerId != nil else { return }
         try? self.appendSwitchJournal()
+    }
+
+    private func loadCachedLocalCostSummary() -> LocalCostSummary {
+        guard let data = try? Data(contentsOf: CodexPaths.costCacheURL) else {
+            return .empty
+        }
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return (try? decoder.decode(LocalCostSummary.self, from: data)) ?? .empty
+    }
+
+    private func saveCachedLocalCostSummary(_ summary: LocalCostSummary) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+
+        guard let data = try? encoder.encode(summary) else { return }
+        try? CodexPaths.writeSecureFile(data, to: CodexPaths.costCacheURL)
     }
 
     private func slug(from label: String) -> String {

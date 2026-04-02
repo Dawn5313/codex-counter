@@ -47,8 +47,12 @@ final class DetachedWindowPresenter: NSObject, NSWindowDelegate {
         let anyView = AnyView(content())
 
         if let existing = self.windows[id] {
-            existing.setContentSize(size)
-            existing.setFrameOrigin(origin)
+            if existing.frame.size != size {
+                existing.setContentSize(size)
+            }
+            if existing.frame.origin != origin {
+                existing.setFrameOrigin(origin)
+            }
             if let controller = existing.contentViewController as? NSHostingController<AnyView> {
                 controller.rootView = anyView
             } else {
