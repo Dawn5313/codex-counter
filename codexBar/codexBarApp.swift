@@ -40,6 +40,10 @@ struct MenuBarIconView: View {
                         .contentTransition(.numericText())
                         .animation(.easeInOut(duration: 0.3), value: active.primaryUsedPercent)
                 }
+            } else if let provider = store.activeProvider {
+                Text(shortProviderLabel(provider))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -61,6 +65,15 @@ struct MenuBarIconView: View {
         if ref.contains(where: { $0.quotaExhausted || $0.primaryUsedPercent >= 80 || $0.secondaryUsedPercent >= 80 }) {
             return "bolt.circle.fill"
         }
+        if store.activeProvider?.kind == .openAICompatible {
+            return "network"
+        }
         return "terminal.fill"
+    }
+
+    private func shortProviderLabel(_ provider: CodexBarProvider) -> String {
+        let label = provider.label.trimmingCharacters(in: .whitespacesAndNewlines)
+        if label.count <= 6 { return label }
+        return String(label.prefix(6))
     }
 }

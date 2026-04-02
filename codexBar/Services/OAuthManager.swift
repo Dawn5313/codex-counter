@@ -15,16 +15,21 @@ class OAuthManager: NSObject, ObservableObject {
 
     @Published var isAuthenticating = false
     @Published var errorMessage: String?
+    @Published var pendingAuthURL: String?
 
     private var codeVerifier: String = ""
     private var expectedState: String = ""
-    private var localServer: LocalCallbackServer?
+    private var activeFlowID: UUID?
     private var completionHandler: ((Result<OAuthTokens, Error>) -> Void)?
 
     func startOAuth(completion: @escaping (Result<OAuthTokens, Error>) -> Void) {
+        self.cancel()
+
         isAuthenticating = true
         errorMessage = nil
         completionHandler = completion
+        activeFlowID = UUID()
+        pendingAuthURL = nil
 
         codeVerifier = generateCodeVerifier()
         let codeChallenge = generateCodeChallenge(from: codeVerifier)
@@ -49,24 +54,46 @@ class OAuthManager: NSObject, ObservableObject {
             return
         }
 
-        localServer = LocalCallbackServer(port: 1455)
-        localServer?.start { [weak self] code, returnedState in
-            guard let self else { return }
-            guard returnedState == self.expectedState else {
-                self.fail(OAuthError.stateMismatch)
-                return
-            }
-            self.exchangeCode(code)
-        }
-
+        pendingAuthURL = url.absoluteString
         NSWorkspace.shared.open(url)
     }
 
     func cancel() {
-        localServer?.stop()
-        localServer = nil
         isAuthenticating = false
+        activeFlowID = nil
+        pendingAuthURL = nil
         completionHandler = nil
+        codeVerifier = ""
+        expectedState = ""
+    }
+
+    func completeOAuth(from input: String) {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else {
+            reportRecoverable(OAuthError.invalidCallback)
+            return
+        }
+        guard activeFlowID != nil, codeVerifier.isEmpty == false else {
+            reportRecoverable(OAuthError.noPendingFlow)
+            return
+        }
+
+        let parsed = self.parseManualInput(trimmed)
+        guard let code = parsed.code else {
+            reportRecoverable(OAuthError.invalidCallback)
+            return
+        }
+
+        if let returnedState = parsed.state,
+           returnedState != expectedState {
+            NSLog(
+                "CodexAppBar OAuth state mismatch on manual completion: expected=%@ returned=%@; attempting PKCE exchange anyway",
+                expectedState,
+                returnedState
+            )
+        }
+
+        self.exchangeCode(code)
     }
 
     // MARK: - Private
@@ -96,23 +123,23 @@ class OAuthManager: NSObject, ObservableObject {
         URLSession.shared.dataTask(with: request) { [weak self] data, _, error in
             guard let self else { return }
             if let error {
-                self.fail(error)
+                self.reportRecoverable(error)
                 return
             }
             guard let data,
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                self.fail(OAuthError.noToken)
+                self.reportRecoverable(OAuthError.noToken)
                 return
             }
             if let errMsg = json["error"] as? String {
                 let desc = json["error_description"] as? String ?? ""
-                self.fail(OAuthError.serverError("\(errMsg): \(desc)"))
+                self.reportRecoverable(OAuthError.serverError("\(errMsg): \(desc)"))
                 return
             }
             guard let accessToken = json["access_token"] as? String,
                   let refreshToken = json["refresh_token"] as? String,
                   let idToken = json["id_token"] as? String else {
-                self.fail(OAuthError.noToken)
+                self.reportRecoverable(OAuthError.noToken)
                 return
             }
             let tokens = OAuthTokens(
@@ -121,24 +148,58 @@ class OAuthManager: NSObject, ObservableObject {
                 idToken: idToken
             )
             DispatchQueue.main.async {
-                self.localServer?.stop()
-                self.localServer = nil
                 self.isAuthenticating = false
+                self.activeFlowID = nil
+                self.pendingAuthURL = nil
                 self.completionHandler?(.success(tokens))
                 self.completionHandler = nil
+                self.codeVerifier = ""
+                self.expectedState = ""
             }
         }.resume()
     }
 
     private func fail(_ error: Error) {
         DispatchQueue.main.async {
-            self.localServer?.stop()
-            self.localServer = nil
-            self.isAuthenticating = false
             self.errorMessage = error.localizedDescription
+            self.isAuthenticating = false
+            self.activeFlowID = nil
+            self.pendingAuthURL = nil
             self.completionHandler?(.failure(error))
             self.completionHandler = nil
         }
+    }
+
+    private func reportRecoverable(_ error: Error) {
+        DispatchQueue.main.async {
+            self.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func parseManualInput(_ input: String) -> (code: String?, state: String?) {
+        if let url = URL(string: input),
+           let components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            let code = components.queryItems?.first(where: { $0.name == "code" })?.value
+            let state = components.queryItems?.first(where: { $0.name == "state" })?.value
+            if code != nil || state != nil {
+                return (code, state)
+            }
+        }
+
+        if let regex = try? NSRegularExpression(pattern: #"[?&]code=([^&]+)"#),
+           let match = regex.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),
+           let codeRange = Range(match.range(at: 1), in: input) {
+            let stateRegex = try? NSRegularExpression(pattern: #"[?&]state=([^&]+)"#)
+            var state: String?
+            if let stateRegex,
+               let stateMatch = stateRegex.firstMatch(in: input, range: NSRange(input.startIndex..., in: input)),
+               let stateRange = Range(stateMatch.range(at: 1), in: input) {
+                state = String(input[stateRange])
+            }
+            return (String(input[codeRange]).removingPercentEncoding, state?.removingPercentEncoding)
+        }
+
+        return (input, nil)
     }
 
     private func generateCodeVerifier() -> String {
@@ -167,13 +228,15 @@ struct OAuthTokens {
 }
 
 enum OAuthError: LocalizedError {
-    case invalidURL, stateMismatch, noToken
+    case invalidURL, stateMismatch, noToken, invalidCallback, noPendingFlow
     case serverError(String)
     var errorDescription: String? {
         switch self {
         case .invalidURL: return "无效的授权 URL"
         case .stateMismatch: return "State 验证失败"
         case .noToken: return "未获取到 Token"
+        case .invalidCallback: return "无法从回调链接中解析 code"
+        case .noPendingFlow: return "当前没有待完成的登录流程，请重新点击 Login OpenAI"
         case .serverError(let msg): return "授权失败: \(msg)"
         }
     }
@@ -184,6 +247,7 @@ class LocalCallbackServer {
     private let port: UInt16
     private var isRunning = false
     private var handler: ((String, String) -> Void)?
+    private var serverFd: Int32 = -1
 
     init(port: UInt16) {
         self.port = port
@@ -199,12 +263,23 @@ class LocalCallbackServer {
 
     func stop() {
         isRunning = false
+        if serverFd >= 0 {
+            shutdown(serverFd, SHUT_RDWR)
+            close(serverFd)
+            serverFd = -1
+        }
     }
 
     private func listen() {
         let serverFd = socket(AF_INET, SOCK_STREAM, 0)
         guard serverFd >= 0 else { return }
-        defer { close(serverFd) }
+        self.serverFd = serverFd
+        defer {
+            if self.serverFd >= 0 {
+                close(self.serverFd)
+                self.serverFd = -1
+            }
+        }
 
         var opt: Int32 = 1
         setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, socklen_t(MemoryLayout<Int32>.size))

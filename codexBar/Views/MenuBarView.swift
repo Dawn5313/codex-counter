@@ -1,25 +1,25 @@
-import SwiftUI
+import AppKit
 import Combine
+import SwiftUI
 import UserNotifications
 
 struct MenuBarView: View {
     @EnvironmentObject var store: TokenStore
     @EnvironmentObject var oauth: OAuthManager
+
     @State private var isRefreshing = false
     @State private var showError: String?
     @State private var showSuccess: String?
     @State private var now = Date()
     @State private var refreshingAccounts: Set<String> = []
+    @State private var menuVisible = false
+    @State private var languageToggle = false
+    @State private var showCostDetails = false
 
-    // 每 10 秒刷新倒计时显示
     private let countdownTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
-    // 菜单打开时 10 秒快速刷新活跃账号；菜单关闭时 5 分钟后台刷新全部
     private let quickTimer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
     private let slowTimer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
-    @State private var menuVisible = false
-    @State private var languageToggle = false  // 用于触发语言切换后的重绘
 
-    /// email → accounts (sorted: active first, then by status)
     private var groupedAccounts: [(email: String, accounts: [TokenAccount])] {
         var dict: [String: [TokenAccount]] = [:]
         var order: [String] = []
@@ -30,7 +30,6 @@ struct MenuBarView: View {
             }
             dict[acc.email]!.append(acc)
         }
-        // sort accounts within each group
         let sortedOrder = order.sorted { e1, e2 in
             let best1 = bestStatus(dict[e1]!)
             let best2 = bestStatus(dict[e2]!)
@@ -62,12 +61,25 @@ struct MenuBarView: View {
         store.accounts.filter { $0.usageStatus == .ok }.count
     }
 
+    private var isCompletelyEmpty: Bool {
+        store.accounts.isEmpty && store.customProviders.isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 标题栏
             HStack {
                 Text("CodexAppBar")
                     .font(.system(size: 13, weight: .semibold))
+
+                if let active = store.activeProvider {
+                    Text(active.label)
+                        .font(.system(size: 10, weight: .medium))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.accentColor.opacity(0.12))
+                        .foregroundColor(.accentColor)
+                        .cornerRadius(4)
+                }
 
                 if !store.accounts.isEmpty {
                     Text(L.available(availableCount, store.accounts.count))
@@ -95,16 +107,60 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
 
+            if let activeProvider = store.activeProvider,
+               let activeAccount = store.activeProviderAccount {
+                Divider()
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(activeProvider.label) · \(activeAccount.label)")
+                        .font(.system(size: 11, weight: .medium))
+                    Text("Model: \(store.activeModel)")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                    Text("Est. today: \(currency(store.localCostSummary.todayCostUSD)) · 30d: \(currency(store.localCostSummary.last30DaysCostUSD))")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .onHover { hovering in
+                            showCostDetails = hovering
+                        }
+                    if showCostDetails && !store.localCostSummary.dailyEntries.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("All-time: \(currency(store.localCostSummary.lifetimeCostUSD)) · Tokens: \(compactTokens(store.localCostSummary.lifetimeTokens))")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundColor(.secondary)
+                            ForEach(Array(store.localCostSummary.dailyEntries.prefix(7))) { entry in
+                                HStack {
+                                    Text(shortDay(entry.date))
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Text(compactTokens(entry.totalTokens))
+                                        .font(.system(size: 9))
+                                        .foregroundColor(.secondary)
+                                    Text(currency(entry.costUSD))
+                                        .font(.system(size: 9, weight: .medium))
+                                }
+                            }
+                        }
+                        .padding(.top, 2)
+                    }
+                    Text("Changes apply to new sessions.")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+
             Divider()
 
-            if store.accounts.isEmpty {
+            if isCompletelyEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "person.crop.circle.badge.plus")
                         .font(.system(size: 32))
                         .foregroundColor(.secondary)
                     Text(L.noAccounts)
                         .foregroundColor(.secondary)
-                    Text(L.addAccountHint)
+                    Text("Add an OpenAI account or create a custom provider.")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -112,31 +168,153 @@ struct MenuBarView: View {
                 .padding(.vertical, 24)
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(groupedAccounts, id: \.email) { group in
-                            VStack(alignment: .leading, spacing: 2) {
-                                // Email group header
-                                Text(group.email)
+                    VStack(alignment: .leading, spacing: 12) {
+                        if !store.customProviders.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("Providers")
                                     .font(.system(size: 11, weight: .medium))
                                     .foregroundColor(.secondary)
-                                    .lineLimit(1)
                                     .padding(.leading, 4)
 
-                                // Account rows
-                                ForEach(group.accounts) { account in
-                                    AccountRowView(
-                                        account: account,
-                                        isActive: account.isActive,
-                                        now: now,
-                                        isRefreshing: refreshingAccounts.contains(account.id)
-                                    ) {
-                                        activateAccount(account)
-                                    } onRefresh: {
-                                        Task { await refreshAccount(account) }
-                                    } onReauth: {
-                                        reauthAccount(account)
-                                    } onDelete: {
-                                        store.remove(account)
+                                ForEach(store.customProviders) { provider in
+                                    CompatibleProviderRowView(
+                                        provider: provider,
+                                        isActiveProvider: store.activeProvider?.id == provider.id,
+                                        activeAccountId: provider.activeAccountId
+                                    ) { account in
+                                        activateCompatibleProvider(providerID: provider.id, accountID: account.id)
+                                    } onAddAccount: {
+                                        openAddProviderAccountWindow(provider: provider)
+                                    } onDeleteAccount: { account in
+                                        deleteCompatibleAccount(providerID: provider.id, accountID: account.id)
+                                    } onDeleteProvider: {
+                                        deleteProvider(providerID: provider.id)
+                                    }
+                                }
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("OpenAI Accounts")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .padding(.leading, 4)
+
+                                Spacer()
+
+                                Button("Login OpenAI") {
+                                    startOAuthLogin()
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.mini)
+                                .font(.system(size: 10, weight: .medium))
+                            }
+
+                            if store.accounts.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("No OpenAI account added.")
+                                        .font(.system(size: 11, weight: .medium))
+                                    Text("Login to track quota and switch OpenAI OAuth accounts.")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 10)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(Color.secondary.opacity(0.06))
+                                )
+                            } else {
+                                ForEach(groupedAccounts, id: \.email) { group in
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(group.email)
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                            .padding(.leading, 4)
+
+                                        ForEach(group.accounts) { account in
+                                            AccountRowView(
+                                                account: account,
+                                                isActive: account.isActive,
+                                                now: now,
+                                                isRefreshing: refreshingAccounts.contains(account.id)
+                                            ) {
+                                                activateAccount(account)
+                                            } onRefresh: {
+                                                Task { await refreshAccount(account) }
+                                            } onReauth: {
+                                                reauthAccount(account)
+                                            } onDelete: {
+                                                store.remove(account)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if !store.billingHistory.buckets.isEmpty || !store.billingHistory.recentSessions.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("History & Billing")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .padding(.leading, 4)
+
+                                ForEach(Array(store.billingHistory.buckets.prefix(6))) { bucket in
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        HStack {
+                                            Text("\(bucket.providerLabel) · \(bucket.accountLabel)")
+                                                .font(.system(size: 11, weight: .medium))
+                                            Spacer()
+                                            Text(currency(bucket.last30DaysCostUSD))
+                                                .font(.system(size: 11, weight: .medium))
+                                        }
+
+                                        HStack {
+                                            Text("Today \(currency(bucket.todayCostUSD))")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary)
+                                            Spacer()
+                                            Text("\(bucket.sessionCount) sessions")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .fill(Color.secondary.opacity(0.06))
+                                    )
+                                }
+
+                                if !store.billingHistory.recentSessions.isEmpty {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("Recent Sessions")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundColor(.secondary)
+                                            .padding(.leading, 4)
+
+                                        ForEach(Array(store.billingHistory.recentSessions.prefix(5))) { session in
+                                            HStack(spacing: 6) {
+                                                VStack(alignment: .leading, spacing: 1) {
+                                                    Text("\(session.providerLabel) · \(session.accountLabel)")
+                                                        .font(.system(size: 10, weight: .medium))
+                                                    Text(session.model)
+                                                        .font(.system(size: 9))
+                                                        .foregroundColor(.secondary)
+                                                }
+                                                Spacer()
+                                                Text(currency(session.costUSD))
+                                                    .font(.system(size: 10))
+                                                Text(shortDateTime(session.startedAt))
+                                                    .font(.system(size: 9))
+                                                    .foregroundColor(.secondary)
+                                            }
+                                            .padding(.horizontal, 4)
+                                        }
                                     }
                                 }
                             }
@@ -145,7 +323,7 @@ struct MenuBarView: View {
                     .padding(.horizontal, 8)
                     .padding(.vertical, 6)
                 }
-                .frame(maxHeight: 380)
+                .frame(minHeight: 180, maxHeight: 420)
             }
 
             if let success = showSuccess {
@@ -168,7 +346,7 @@ struct MenuBarView: View {
                         .foregroundColor(.yellow)
                     Text(error)
                         .font(.caption)
-                        .lineLimit(2)
+                        .lineLimit(3)
                     Spacer()
                     Button {
                         showError = nil
@@ -183,10 +361,13 @@ struct MenuBarView: View {
 
             Divider()
 
-            // 底部操作栏
             HStack(spacing: 8) {
                 if let lastUpdate = store.accounts.compactMap({ $0.lastChecked }).max() {
                     Text(relativeTime(lastUpdate))
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                } else if let provider = store.activeProvider {
+                    Text(provider.hostLabel)
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
@@ -194,32 +375,31 @@ struct MenuBarView: View {
                 Spacer()
 
                 Button {
-                    oauth.startOAuth { result in
-                        switch result {
-                        case .success(let tokens):
-                            let account = AccountBuilder.build(from: tokens)
-                            store.addOrUpdate(account)
-                            Task { await WhamService.shared.refreshOne(account: account, store: store) }
-                        case .failure(let error):
-                            showError = error.localizedDescription
-                        }
-                    }
+                    startOAuthLogin()
                 } label: {
-                    Image(systemName: "plus")
+                    Image(systemName: "person.crop.circle.badge.plus")
                         .font(.system(size: 12))
                 }
                 .buttonStyle(.borderless)
                 .help(L.addAccount)
 
                 Button {
+                    openAddProviderWindow()
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.borderless)
+                .help("Add Provider")
+
+                Button {
                     switch L.languageOverride {
-                    case nil:   L.languageOverride = true
-                    case true:  L.languageOverride = false
+                    case nil: L.languageOverride = true
+                    case true: L.languageOverride = false
                     case false: L.languageOverride = nil
                     }
                     languageToggle.toggle()
                 } label: {
-                    // languageToggle 作为 @State 依赖，保证切换后重绘
                     let label = languageToggle ? L.languageOverride : L.languageOverride
                     Text(label == nil ? "AUTO" : (label == true ? "中" : "EN"))
                         .font(.system(size: 10, weight: .medium))
@@ -239,7 +419,7 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .frame(width: 300)
+        .frame(width: 330)
         .onReceive(countdownTimer) { _ in now = Date() }
         .onReceive(quickTimer) { _ in
             guard menuVisible,
@@ -255,12 +435,16 @@ struct MenuBarView: View {
             Task {
                 if !menuVisible { await refresh() }
                 store.markActiveAccount()
+                store.refreshLocalCostSummary()
+                store.refreshBillingHistory()
                 autoSwitchIfNeeded()
             }
         }
         .onAppear {
             menuVisible = true
             store.markActiveAccount()
+            store.refreshLocalCostSummary()
+            store.refreshBillingHistory()
         }
         .onDisappear { menuVisible = false }
     }
@@ -272,25 +456,168 @@ struct MenuBarView: View {
         return L.hoursAgo(seconds / 3600)
     }
 
+    private func shortDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func shortDay(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func currency(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 2
+        return formatter.string(from: NSNumber(value: value)) ?? String(format: "$%.2f", value)
+    }
+
+    private func compactTokens(_ value: Int) -> String {
+        let number = Double(value)
+        if number >= 1_000_000_000 {
+            return String(format: "%.2fB", number / 1_000_000_000)
+        }
+        if number >= 1_000_000 {
+            return String(format: "%.2fM", number / 1_000_000)
+        }
+        if number >= 1_000 {
+            return String(format: "%.1fK", number / 1_000)
+        }
+        return "\(value)"
+    }
+
     private func activateAccount(_ account: TokenAccount) {
         do {
             try store.activate(account)
+            showSuccess = "Updated Codex configuration. Changes apply to new sessions."
         } catch {
             showError = error.localizedDescription
         }
     }
 
-    /// 检查当前账号额度，必要时自动切换到最优账号
+    private func activateCompatibleProvider(providerID: String, accountID: String) {
+        do {
+            try store.activateCustomProvider(providerID: providerID, accountID: accountID)
+            showSuccess = "Updated Codex configuration. Changes apply to new sessions."
+        } catch {
+            showError = error.localizedDescription
+        }
+    }
+
+    private func deleteCompatibleAccount(providerID: String, accountID: String) {
+        do {
+            try store.removeCustomProviderAccount(providerID: providerID, accountID: accountID)
+            showSuccess = "Removed provider account."
+        } catch {
+            showError = error.localizedDescription
+        }
+    }
+
+    private func deleteProvider(providerID: String) {
+        do {
+            try store.removeCustomProvider(providerID: providerID)
+            showSuccess = "Removed provider."
+        } catch {
+            showError = error.localizedDescription
+        }
+    }
+
+    private func startOAuthLogin() {
+        oauth.startOAuth { result in
+            switch result {
+            case .success(let tokens):
+                let account = AccountBuilder.build(from: tokens)
+                store.addOrUpdate(account)
+                Task { await WhamService.shared.refreshOne(account: account, store: store) }
+                showSuccess = "Updated Codex configuration. Changes apply to new sessions."
+                DetachedWindowPresenter.shared.close(id: "oauth-login")
+            case .failure(let error):
+                showError = error.localizedDescription
+            }
+        }
+        openOAuthWindow()
+    }
+
+    private func openOAuthWindow() {
+        DetachedWindowPresenter.shared.show(
+            id: "oauth-login",
+            title: "OpenAI OAuth",
+            size: CGSize(width: 560, height: 420)
+        ) {
+            OpenAIManualOAuthSheet(
+                authURL: oauth.pendingAuthURL ?? "",
+                isAuthenticating: oauth.isAuthenticating,
+                errorMessage: oauth.errorMessage
+            ) { input in
+                oauth.completeOAuth(from: input)
+            } onOpenBrowser: {
+                if let authURL = oauth.pendingAuthURL, let url = URL(string: authURL) {
+                    NSWorkspace.shared.open(url)
+                }
+            } onCopyLink: {
+                guard let authURL = oauth.pendingAuthURL else { return }
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(authURL, forType: .string)
+            } onCancel: {
+                oauth.cancel()
+                DetachedWindowPresenter.shared.close(id: "oauth-login")
+            }
+        }
+    }
+
+    private func openAddProviderWindow() {
+        DetachedWindowPresenter.shared.show(
+            id: "add-provider",
+            title: "Add Provider",
+            size: CGSize(width: 420, height: 320)
+        ) {
+            AddProviderSheet { label, baseURL, accountLabel, apiKey in
+                do {
+                    try store.addCustomProvider(label: label, baseURL: baseURL, accountLabel: accountLabel, apiKey: apiKey)
+                    showSuccess = "Updated Codex configuration. Changes apply to new sessions."
+                    DetachedWindowPresenter.shared.close(id: "add-provider")
+                } catch {
+                    showError = error.localizedDescription
+                }
+            } onCancel: {
+                DetachedWindowPresenter.shared.close(id: "add-provider")
+            }
+        }
+    }
+
+    private func openAddProviderAccountWindow(provider: CodexBarProvider) {
+        DetachedWindowPresenter.shared.show(
+            id: "add-provider-account-\(provider.id)",
+            title: "Add Account",
+            size: CGSize(width: 400, height: 220)
+        ) {
+            AddProviderAccountSheet(provider: provider) { label, apiKey in
+                do {
+                    try store.addCustomProviderAccount(providerID: provider.id, label: label, apiKey: apiKey)
+                    showSuccess = "Saved provider account."
+                    DetachedWindowPresenter.shared.close(id: "add-provider-account-\(provider.id)")
+                } catch {
+                    showError = error.localizedDescription
+                }
+            } onCancel: {
+                DetachedWindowPresenter.shared.close(id: "add-provider-account-\(provider.id)")
+            }
+        }
+    }
+
     private func autoSwitchIfNeeded() {
         guard let active = store.accounts.first(where: { $0.isActive }) else { return }
 
-        let primary5hRemaining  = 100.0 - active.primaryUsedPercent
+        let primary5hRemaining = 100.0 - active.primaryUsedPercent
         let secondary7dRemaining = 100.0 - active.secondaryUsedPercent
-
         let shouldSwitch = primary5hRemaining <= 10.0 || secondary7dRemaining <= 3.0
         guard shouldSwitch else { return }
 
-        // 找最优账号：未被封禁、token 未过期、非当前账号、usageStatus 最优
         let candidates = store.accounts.filter {
             !$0.isSuspended && !$0.tokenExpired && $0.accountId != active.accountId
         }.sorted {
@@ -301,7 +628,6 @@ struct MenuBarView: View {
         }
 
         guard let best = candidates.first else {
-            // 无可用账号，发通知提醒用户
             sendNotification(title: L.autoSwitchTitle, body: L.autoSwitchNoCandidates)
             return
         }
@@ -309,9 +635,7 @@ struct MenuBarView: View {
         do {
             try store.activate(best)
             sendAutoSwitchNotification(from: active, to: best)
-        } catch {
-            // 静默失败，等下次扫描再试
-        }
+        } catch {}
     }
 
     private func sendAutoSwitchNotification(from old: TokenAccount, to new: TokenAccount) {
@@ -338,33 +662,11 @@ struct MenuBarView: View {
         }
     }
 
-    private func forceQuitCodex(_ running: [NSRunningApplication], reopen: Bool) {
-        let ws = NSWorkspace.shared
-
-        if reopen {
-            guard let url = ws.urlForApplication(withBundleIdentifier: "com.openai.codex") else {
-                running.forEach { $0.forceTerminate() }
-                return
-            }
-            var observer: NSObjectProtocol?
-            observer = ws.notificationCenter.addObserver(
-                forName: NSWorkspace.didTerminateApplicationNotification,
-                object: nil,
-                queue: .main
-            ) { note in
-                guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
-                      app.bundleIdentifier == "com.openai.codex" else { return }
-                ws.notificationCenter.removeObserver(observer!)
-                ws.open(url)
-            }
-        }
-
-        running.forEach { $0.forceTerminate() }
-    }
-
     private func refresh() async {
         isRefreshing = true
         await WhamService.shared.refreshAll(store: store)
+        store.refreshLocalCostSummary()
+        store.refreshBillingHistory()
         isRefreshing = false
     }
 
@@ -379,7 +681,6 @@ struct MenuBarView: View {
             switch result {
             case .success(let tokens):
                 var updated = AccountBuilder.build(from: tokens)
-                // 若 account_id 匹配，覆盖原账号；否则按新账号添加
                 if updated.accountId == account.accountId {
                     updated.isActive = account.isActive
                     updated.tokenExpired = false
@@ -387,9 +688,73 @@ struct MenuBarView: View {
                 }
                 store.addOrUpdate(updated)
                 Task { await WhamService.shared.refreshOne(account: updated, store: store) }
+                showSuccess = "Updated Codex configuration. Changes apply to new sessions."
             case .failure(let error):
                 showError = error.localizedDescription
             }
         }
+    }
+}
+
+private struct AddProviderSheet: View {
+    @State private var label = ""
+    @State private var baseURL = ""
+    @State private var accountLabel = ""
+    @State private var apiKey = ""
+
+    let onSave: (String, String, String, String) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Provider")
+                .font(.headline)
+
+            TextField("Provider name", text: $label)
+            TextField("Base URL", text: $baseURL)
+            TextField("Account label", text: $accountLabel)
+            SecureField("API key", text: $apiKey)
+
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                Button("Save") {
+                    onSave(label, baseURL, accountLabel, apiKey)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(16)
+        .frame(width: 360)
+    }
+}
+
+private struct AddProviderAccountSheet: View {
+    let provider: CodexBarProvider
+    let onSave: (String, String) -> Void
+    let onCancel: () -> Void
+
+    @State private var label = ""
+    @State private var apiKey = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Add Account · \(provider.label)")
+                .font(.headline)
+
+            TextField("Account label", text: $label)
+            SecureField("API key", text: $apiKey)
+
+            HStack {
+                Spacer()
+                Button("Cancel", action: onCancel)
+                Button("Save") {
+                    onSave(label, apiKey)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(16)
+        .frame(width: 340)
     }
 }

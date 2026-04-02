@@ -1,90 +1,111 @@
 # CodexAppBar
 
-A macOS menu bar app for managing multiple ChatGPT/Codex accounts. Switch accounts instantly and monitor quota usage without opening a browser.
+A macOS menu bar app for switching Codex providers and accounts without breaking your shared Codex session history.
 
-> **中文说明见下方 / Chinese version below**
+CodexAppBar is designed for people who use:
 
----
+- OpenAI OAuth accounts for Codex quota tracking
+- custom OpenAI-compatible providers
+- multiple API keys under the same provider
+- one shared `~/.codex` session pool with Codex Desktop
 
-![CodexAppBar English](en.png)
+It updates the active Codex provider/account for new sessions while leaving existing session history in place.
 
-## Features
+## Highlights
 
-- **Multi-account management** — Add unlimited ChatGPT accounts via OAuth
-- **Quota monitoring** — Tracks both the 5-hour rolling window and the weekly quota in real time
-- **Account switching** *(experimental)* — Writes the selected account to `~/.codex/auth.json`; requires quitting Codex.app to take effect. If using subagents, prefer logging out from within Codex.app instead
-- **Auto refresh** — Active account refreshes every 10 seconds while the menu is open; all accounts refresh every 5 minutes in the background
-- **Status indicators** — Color-coded badges and menu bar icon reflect account health (normal / warning / quota exhausted / suspended)
-- **Animated UI** — Progress bars and percentages animate on update
+- OpenAI OAuth account management for Codex
+- Custom OpenAI-compatible provider support
+- Multiple API-key accounts per provider
+- Provider/account switching for new Codex sessions
+- Shared `~/.codex` session history with Codex Desktop
+- Local cost and token history from Codex session logs
+- Daily breakdown plus all-time totals
+- OpenAI quota tracking for OAuth-backed accounts
+
+## What It Does
+
+CodexAppBar keeps its own config in `~/.codexbar/config.json`, then synchronizes the currently selected provider/account into:
+
+- `~/.codex/config.toml`
+- `~/.codex/auth.json`
+
+It does **not** move or split your Codex sessions. That means:
+
+- Codex Desktop keeps using the same `~/.codex/sessions`
+- old sessions stay resumable
+- switching provider only changes future requests
+
+## What It Does Not Bundle
+
+CodexAppBar does **not** ship with any private providers, API keys, or preconfigured accounts.
+
+You bring your own:
+
+- provider base URLs
+- API keys
+- OpenAI OAuth accounts
+
+The app can import what already exists on your machine, but the repository itself does not hard-bind any personal provider setup.
+
+## Current OAuth Flow
+
+OpenAI OAuth uses a browser-based flow with manual callback completion:
+
+1. Click `Login OpenAI`
+2. Open the generated authorization link in your browser
+3. Finish authorization
+4. When the browser lands on `http://localhost:1455/auth/callback?...`, copy the full URL
+5. Paste that URL back into CodexAppBar
+6. CodexAppBar exchanges the code and imports the account
+
+This avoids depending on a fragile localhost callback race with other processes.
+
+## Cost And Billing Notes
+
+Cost history is derived from local Codex session logs under `~/.codex/sessions` and `~/.codex/archived_sessions`.
+
+- Token totals are based on Codex session log events.
+- Cost is an estimate derived from model pricing.
+- For custom OpenAI-compatible providers, the displayed dollar value may differ from your provider's real billing unless their pricing matches OpenAI.
+
+If you care about exact provider-side billing, treat the cost section as a usage estimate rather than an invoice.
 
 ## Requirements
 
-- macOS 13 Ventura or later
-- [Codex](https://github.com/openai/codex) desktop app installed at `/Applications/Codex.app`
+- macOS 13+
+- [Codex Desktop / CLI](https://github.com/openai/codex)
+- Xcode 15+ to build locally
 
-## Installation
+## Build
 
-1. Clone the repository:
-   ```sh
-   git clone https://github.com/yourname/codexBar.git
-   ```
-2. Open `codexBar.xcodeproj` in Xcode 15+
-3. Select your development team in **Signing & Capabilities**
-4. Build and run (`⌘R`)
+```sh
+git clone https://github.com/lizhelang/codexappbar.git
+cd codexappbar
+open codexBar.xcodeproj
+```
 
-## Usage
+Then:
 
-1. Launch CodexAppBar — it appears in the menu bar
-2. Click **+** to add a ChatGPT account via OAuth
-3. Click **切换 / Switch** on any account to activate it; CodexAppBar will confirm and then restart Codex.app
-4. The menu bar icon reflects the active account's status:
-   - `terminal.fill` — normal
-   - `bolt.circle.fill` — quota nearing limit (≥ 80%)
-   - `exclamationmark.triangle.fill` — weekly quota exhausted
-   - `xmark.circle.fill` — account suspended
+1. Select your signing team in Xcode
+2. Build and run the `codexBar` target
 
-## How it works
+## Roadmap
 
-CodexAppBar uses the same OAuth client ID as the official Codex desktop app to authenticate with `auth.openai.com`. After login, tokens are stored locally in the app sandbox and the active account's tokens are written to `~/.codex/auth.json` for the Codex CLI/app to consume.
+- Better provider-specific pricing configuration
+- Cleaner provider/account billing attribution
+- Improved OpenAI account import from existing Codex auth
+- More polished detached settings windows
 
-Usage data is fetched from the internal `chatgpt.com/backend-api/wham/usage` endpoint.
+## Acknowledgements
 
-## Disclaimer
+CodexAppBar was built with ideas and adapted implementation from these MIT-licensed projects:
 
-This project is **not affiliated with or endorsed by OpenAI**. It uses unofficial internal APIs that may change or break without notice. Use at your own risk. Do not use this tool to violate OpenAI's [Terms of Service](https://openai.com/policies/terms-of-use).
+- [xmasdong/codexbar](https://github.com/xmasdong/codexbar)
+- [steipete/CodexBar](https://github.com/steipete/CodexBar)
+
+See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution details.
 
 ## License
 
 [MIT](LICENSE)
 
----
-
-## 中文说明
-
-![CodexAppBar 中文](zh.png)
-
-CodexAppBar 是一个 macOS 状态栏应用，用于管理多个 ChatGPT/Codex 账号，支持一键切换并实时监控额度。
-
-### 功能
-
-- **多账号管理** — 通过 OAuth 添加任意数量的 ChatGPT 账号
-- **额度监控** — 实时显示 5 小时滚动窗口用量和周额度
-- **账号切换**（实验性）— 将选中账号写入 `~/.codex/auth.json`，需退出 Codex.app 后生效。使用 subagent 时建议通过软件内退出登录功能切换账号
-- **自动刷新** — 菜单打开时活跃账号每 10 秒刷新；后台每 5 分钟刷新所有账号
-- **状态指示** — 彩色徽章和状态栏图标直观反映账号状态（正常 / 即将用尽 / 额度耗尽 / 已停用）
-
-### 系统要求
-
-- macOS 13 Ventura 及以上
-- 已安装 [Codex](https://github.com/openai/codex) 桌面版（位于 `/Applications/Codex.app`）
-
-### 安装
-
-1. 克隆本仓库
-2. 用 Xcode 15+ 打开 `codexBar.xcodeproj`
-3. 在 **Signing & Capabilities** 中选择你的开发者账号
-4. 编译运行（`⌘R`）
-
-### 免责声明
-
-本项目**与 OpenAI 无任何关联**，使用了非官方内部 API，可能随时失效。请勿用于违反 OpenAI 服务条款的行为，风险自担。

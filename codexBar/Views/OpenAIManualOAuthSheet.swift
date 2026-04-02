@@ -1,0 +1,77 @@
+import SwiftUI
+
+struct OpenAIManualOAuthSheet: View {
+    let authURL: String
+    let isAuthenticating: Bool
+    let errorMessage: String?
+    let onComplete: (String) -> Void
+    let onOpenBrowser: () -> Void
+    let onCopyLink: () -> Void
+    let onCancel: () -> Void
+
+    @State private var callbackInput = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("OpenAI OAuth")
+                .font(.headline)
+
+            Text("1. Open the authorization link in your browser.")
+                .font(.system(size: 12))
+            Text("2. Finish authorization.")
+                .font(.system(size: 12))
+            Text("3. When the browser ends on `http://localhost:1455/auth/callback?...`, paste the full URL here. You can also paste just the `code` value.")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+
+            ScrollView {
+                Text(authURL.isEmpty ? "Authorization link not ready." : authURL)
+                    .textSelection(.enabled)
+                    .font(.system(size: 11, weight: .regular, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(height: 72)
+            .padding(8)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color.secondary.opacity(0.08))
+            )
+
+            HStack {
+                Button("Open Browser", action: onOpenBrowser)
+                    .buttonStyle(.borderedProminent)
+                Button("Copy Link", action: onCopyLink)
+                    .buttonStyle(.bordered)
+            }
+
+            TextEditor(text: $callbackInput)
+                .font(.system(size: 12, design: .monospaced))
+                .frame(height: 110)
+                .padding(6)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
+                )
+
+            if let errorMessage, !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.system(size: 11))
+                    .foregroundColor(.orange)
+            }
+
+            HStack {
+                Spacer()
+                Button("Cancel") {
+                    onCancel()
+                }
+                Button("Complete Login") {
+                    onComplete(callbackInput)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(callbackInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !isAuthenticating)
+            }
+        }
+        .padding(16)
+        .frame(width: 520)
+    }
+}
