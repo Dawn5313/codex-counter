@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		C0C16B462F7423BE00A2A16F /* codexAppBar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = codexAppBar.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0C16B462F7423BE00A2A16F /* codexbar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = codexbar.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -53,7 +53,7 @@
 		C0C16B472F7423BE00A2A16F /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C0C16B462F7423BE00A2A16F /* codexAppBar.app */,
+				C0C16B462F7423BE00A2A16F /* codexbar.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -61,9 +61,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		C0C16B452F7423BE00A2A16F /* codexBar */ = {
+		C0C16B452F7423BE00A2A16F /* codexbar */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C0C16B512F7423BF00A2A16F /* Build configuration list for PBXNativeTarget "codexBar" */;
+			buildConfigurationList = C0C16B512F7423BF00A2A16F /* Build configuration list for PBXNativeTarget "codexbar" */;
 			buildPhases = (
 				C0C16B422F7423BE00A2A16F /* Sources */,
 				C0C16B432F7423BE00A2A16F /* Frameworks */,
@@ -76,11 +76,11 @@
 			fileSystemSynchronizedGroups = (
 				C0C16B482F7423BE00A2A16F /* codexBar */,
 			);
-			name = codexBar;
+			name = codexbar;
 			packageProductDependencies = (
 			);
-			productName = codexBar;
-			productReference = C0C16B462F7423BE00A2A16F /* codexAppBar.app */;
+			productName = codexbar;
+			productReference = C0C16B462F7423BE00A2A16F /* codexbar.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -98,7 +98,7 @@
 					};
 				};
 			};
-			buildConfigurationList = C0C16B412F7423BE00A2A16F /* Build configuration list for PBXProject "codexBar" */;
+			buildConfigurationList = C0C16B412F7423BE00A2A16F /* Build configuration list for PBXProject "codexbar" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -112,7 +112,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				C0C16B452F7423BE00A2A16F /* codexBar */,
+				C0C16B452F7423BE00A2A16F /* codexbar */,
 			);
 		};
 /* End PBXProject section */
@@ -274,6 +274,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = codexBar/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = codexbar;
+				INFOPLIST_KEY_CFBundleName = codexbar;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -284,7 +286,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = xmasdong.codexAppBar;
-				PRODUCT_NAME = codexAppBar;
+				PRODUCT_NAME = codexbar;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -311,6 +313,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = codexBar/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = codexbar;
+				INFOPLIST_KEY_CFBundleName = codexbar;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -321,7 +325,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.6;
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = xmasdong.codexAppBar;
-				PRODUCT_NAME = codexAppBar;
+				PRODUCT_NAME = codexbar;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -335,7 +339,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		C0C16B412F7423BE00A2A16F /* Build configuration list for PBXProject "codexBar" */ = {
+		C0C16B412F7423BE00A2A16F /* Build configuration list for PBXProject "codexbar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C0C16B4F2F7423BF00A2A16F /* Debug */,
@@ -344,7 +348,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C0C16B512F7423BF00A2A16F /* Build configuration list for PBXNativeTarget "codexBar" */ = {
+		C0C16B512F7423BF00A2A16F /* Build configuration list for PBXNativeTarget "codexbar" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				C0C16B522F7423BF00A2A16F /* Debug */,

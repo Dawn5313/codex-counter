@@ -26,4 +26,3 @@ Copyright (c) 2025 codexBar contributors
 MIT License
 
 Copyright (c) 2026 Peter Steinberger
-

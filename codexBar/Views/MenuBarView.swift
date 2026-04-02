@@ -154,7 +154,7 @@ struct MenuBarView: View {
     private var menuContentStack: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
-                Text("CodexAppBar")
+                Text("codexbar")
                     .font(.system(size: 13, weight: .semibold))
 
                 if let active = store.activeProvider {
