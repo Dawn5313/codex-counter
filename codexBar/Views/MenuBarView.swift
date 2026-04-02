@@ -419,7 +419,7 @@ struct MenuBarView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
         }
-        .frame(width: 330)
+        .frame(width: 300)
         .onReceive(countdownTimer) { _ in now = Date() }
         .onReceive(quickTimer) { _ in
             guard menuVisible,

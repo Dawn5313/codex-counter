@@ -78,27 +78,23 @@ struct CodexSyncService {
         provider: CodexBarProvider
     ) -> String {
         var text = existingText
+        let modelProviderValue = "\"openai\""
 
-        text = self.upsertSetting(text, key: "model_provider", value: "\"OpenAI\"")
+        text = self.upsertSetting(text, key: "model_provider", value: modelProviderValue)
         text = self.upsertSetting(text, key: "model", value: self.quote(global.defaultModel))
         text = self.upsertSetting(text, key: "review_model", value: self.quote(global.reviewModel))
         text = self.upsertSetting(text, key: "model_reasoning_effort", value: self.quote(global.reasoningEffort))
 
         text = self.removeSetting(text, key: "service_tier")
         text = self.removeSetting(text, key: "oss_provider")
+        text = self.removeSetting(text, key: "openai_base_url")
         text = self.removeSetting(text, key: "model_catalog_json")
         text = self.removeSetting(text, key: "preferred_auth_method")
         text = self.removeBlock(text, key: "OpenAI")
+        text = self.removeBlock(text, key: "openai")
 
         if provider.kind == .openAICompatible, let baseURL = provider.baseURL {
-            let block = [
-                "[model_providers.OpenAI]",
-                "name = \"OpenAI\"",
-                "base_url = \(self.quote(baseURL))",
-                "wire_api = \"responses\"",
-                "requires_openai_auth = true",
-            ].joined(separator: "\n")
-            text = self.appendManagedBlock(text, block: block)
+            text = self.upsertSetting(text, key: "openai_base_url", value: self.quote(baseURL))
         }
 
         return text.replacingOccurrences(of: "\n\n\n", with: "\n\n")
@@ -137,13 +133,4 @@ struct CodexSyncService {
         let range = NSRange(text.startIndex..., in: text)
         return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
     }
-
-    private func appendManagedBlock(_ text: String, block: String) -> String {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            return block + "\n"
-        }
-        return trimmed + "\n\n" + block + "\n"
-    }
 }
-

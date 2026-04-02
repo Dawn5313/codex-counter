@@ -251,8 +251,21 @@ final class CodexBarConfigStore {
     }
 
     private func matchOpenAIBaseURL(in text: String) -> String? {
-        guard let blockRegex = try? NSRegularExpression(pattern: #"(?ms)^\[model_providers\.OpenAI\]\n(.*?)(?=^\[|\Z)"#),
-              let baseRegex = try? NSRegularExpression(pattern: #"(?m)^base_url\s*=\s*"([^"]+)""#) else { return nil }
+        if let explicitBaseURL = self.matchValue(for: "openai_base_url", in: text) {
+            return explicitBaseURL
+        }
+
+        return self.matchBaseURLInProviderBlock(in: text, key: "OpenAI")
+            ?? self.matchBaseURLInProviderBlock(in: text, key: "openai")
+    }
+
+    private func matchBaseURLInProviderBlock(in text: String, key: String) -> String? {
+        guard let blockRegex = try? NSRegularExpression(
+            pattern: #"(?ms)^\[model_providers\.#(key)\]\n(.*?)(?=^\[|\Z)"#
+                .replacingOccurrences(of: "#(key)", with: NSRegularExpression.escapedPattern(for: key))
+        ),
+        let baseRegex = try? NSRegularExpression(pattern: #"(?m)^base_url\s*=\s*"([^"]+)""#) else { return nil }
+
         let range = NSRange(text.startIndex..., in: text)
         guard let block = blockRegex.firstMatch(in: text, range: range),
               let blockRange = Range(block.range(at: 1), in: text) else { return nil }

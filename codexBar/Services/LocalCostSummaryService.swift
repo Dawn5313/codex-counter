@@ -33,6 +33,8 @@ struct LocalCostSummaryService {
         var today: Double = 0
         var last30: Double = 0
         var lifetime: Double = 0
+        var todayTokens = 0
+        var last30Tokens = 0
         var lifetimeTokens = 0
         var daily: [Date: (cost: Double, tokens: Int)] = [:]
 
@@ -46,9 +48,11 @@ struct LocalCostSummaryService {
 
             if record.date >= last30Start {
                 last30 += cost
+                last30Tokens += totalTokens
             }
             if record.date >= todayStart {
                 today += cost
+                todayTokens += totalTokens
             }
 
             lifetime += cost
@@ -69,7 +73,9 @@ struct LocalCostSummaryService {
 
         return LocalCostSummary(
             todayCostUSD: today,
+            todayTokens: todayTokens,
             last30DaysCostUSD: last30,
+            last30DaysTokens: last30Tokens,
             lifetimeCostUSD: lifetime,
             lifetimeTokens: lifetimeTokens,
             dailyEntries: dailyEntries,
