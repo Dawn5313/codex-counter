@@ -1,82 +1,114 @@
 # CodexAppBar
 
-A macOS menu bar app for switching Codex providers and accounts without breaking your shared Codex session history.
+一个面向 Codex Desktop 用户的 macOS 状态栏工具，用来管理多个 OpenAI 账号和多个 OpenAI 兼容 provider，同时尽量保持同一个 `~/.codex` 会话池不被打散。
 
-CodexAppBar is designed for people who use:
+CodexAppBar 的目标不是替代 Codex Desktop 本身，而是把下面这些操作做得更顺手：
 
-- OpenAI OAuth accounts for Codex quota tracking
-- custom OpenAI-compatible providers
-- multiple API keys under the same provider
-- one shared `~/.codex` session pool with Codex Desktop
+- 切换 OpenAI OAuth 账号
+- 切换自定义 OpenAI 兼容 provider
+- 给同一个 provider 绑定多个 API key 账号
+- 统计本地会话里的 token 与成本历史
 
-It updates the active Codex provider/account for new sessions while leaving existing session history in place.
+> 英文说明见文末折叠部分。
 
-## Highlights
+## 这是什么
 
-- OpenAI OAuth account management for Codex
-- Custom OpenAI-compatible provider support
-- Multiple API-key accounts per provider
-- Provider/account switching for new Codex sessions
-- Shared `~/.codex` session history with Codex Desktop
-- Local cost and token history from Codex session logs
-- Daily breakdown plus all-time totals
-- OpenAI quota tracking for OAuth-backed accounts
+如果你平时会在 Codex Desktop 之外切换不同 provider，或者同一个 provider 下会维护多组账号/API key，这个工具就是把这些状态统一收口到菜单栏里。
 
-## What It Does
-
-CodexAppBar keeps its own config in `~/.codexbar/config.json`, then synchronizes the currently selected provider/account into:
+它会把当前选中的 provider / account 同步到：
 
 - `~/.codex/config.toml`
 - `~/.codex/auth.json`
 
-It does **not** move or split your Codex sessions. That means:
+但不会去拆分你的会话目录，也不会给每个 provider 单独建一套 `CODEX_HOME`。也就是说：
 
-- Codex Desktop keeps using the same `~/.codex/sessions`
-- old sessions stay resumable
-- switching provider only changes future requests
+- 你仍然只有一个 `~/.codex`
+- Codex Desktop 里的历史 session 仍然保留
+- 切换 provider 只影响“后续新会话”
 
-## What It Does Not Bundle
+## 核心亮点
 
-CodexAppBar does **not** ship with any private providers, API keys, or preconfigured accounts.
+- 支持 **多个 OpenAI OAuth 账号**
+  用于切换不同 OpenAI/Codex 登录态，并读取对应额度信息。
 
-You bring your own:
+- 支持 **多个自定义 OpenAI 兼容 provider**
+  只要是兼容 OpenAI 接口的 `base_url + api_key` 组合，就可以加入。
 
-- provider base URLs
-- API keys
-- OpenAI OAuth accounts
+- 支持 **同一 provider 下多个账号 / API key**
+  适合主账号、备用账号、团队账号并存的情况。
 
-The app can import what already exists on your machine, but the repository itself does not hard-bind any personal provider setup.
+- 保持 **共享的 Codex 会话池**
+  不切 `CODEX_HOME`，尽量不破坏 Codex Desktop 原本的历史与 resume 体验。
 
-## Current OAuth Flow
+- 提供 **本地 token / 成本历史**
+  从 `~/.codex/sessions` 和 `~/.codex/archived_sessions` 扫描本地会话记录，给出汇总与明细。
 
-OpenAI OAuth uses a browser-based flow with manual callback completion:
+## 适合谁
 
-1. Click `Login OpenAI`
-2. Open the generated authorization link in your browser
-3. Finish authorization
-4. When the browser lands on `http://localhost:1455/auth/callback?...`, copy the full URL
-5. Paste that URL back into CodexAppBar
-6. CodexAppBar exchanges the code and imports the account
+CodexAppBar 适合这些用户：
 
-This avoids depending on a fragile localhost callback race with other processes.
+- 你会同时使用 OpenAI 官方账号和第三方 OpenAI 兼容 provider
+- 你不想每次切换都手改 `config.toml`
+- 你想在菜单栏里快速切 provider / 账号
+- 你想保留同一个 `~/.codex` 的历史池
 
-## Cost And Billing Notes
+## 项目特性说明
 
-Cost history is derived from local Codex session logs under `~/.codex/sessions` and `~/.codex/archived_sessions`.
+当前版本重点在于：
 
-- Token totals are based on Codex session log events.
-- Cost is an estimate derived from model pricing.
-- For custom OpenAI-compatible providers, the displayed dollar value may differ from your provider's real billing unless their pricing matches OpenAI.
+- OpenAI OAuth 账号管理
+- 自定义 OpenAI 兼容 provider 管理
+- 多账号切换
+- 本地历史统计
 
-If you care about exact provider-side billing, treat the cost section as a usage estimate rather than an invoice.
+它**不会内置任何私有 provider、私有 API key、私有账号配置**。
 
-## Requirements
+仓库里也不会预置作者自己的：
+
+- provider 地址
+- key
+- 账号
+- 计费配置
+
+你需要在自己的环境里自行添加这些内容。
+
+## OpenAI 登录方式
+
+当前 OpenAI 登录采用“浏览器授权 + 手动粘贴回调链接”的方式：
+
+1. 点击 `Login OpenAI`
+2. 在浏览器里完成授权
+3. 当浏览器地址变成 `http://localhost:1455/auth/callback?...` 时
+4. 复制完整地址
+5. 回到 CodexAppBar 粘贴
+6. 完成 token 交换并导入账号
+
+这样做的目的，是避免单纯依赖本地 localhost 回调监听导致的不稳定行为。
+
+## 成本与账单说明
+
+成本历史来自本地 Codex 会话日志：
+
+- `~/.codex/sessions`
+- `~/.codex/archived_sessions`
+
+这里显示的是**本地 usage estimate**，不是官方账单页面的精确账单。
+
+需要特别说明：
+
+- token 数量更适合作为稳定指标
+- 金额是基于模型价格表的估算
+- 对自定义 OpenAI 兼容 provider，显示的金额不一定等于你的真实供应商扣费
+
+如果某个第三方 provider 的价格策略和 OpenAI 官方定价不同，那“美元金额”只能视为近似估算，不应当直接当作实际账单。
+
+## 运行环境
 
 - macOS 13+
 - [Codex Desktop / CLI](https://github.com/openai/codex)
-- Xcode 15+ to build locally
+- Xcode 15+（如果你要本地编译）
 
-## Build
+## 本地构建
 
 ```sh
 git clone https://github.com/lizhelang/codexappbar.git
@@ -84,28 +116,66 @@ cd codexappbar
 open codexBar.xcodeproj
 ```
 
-Then:
+然后：
 
-1. Select your signing team in Xcode
-2. Build and run the `codexBar` target
+1. 在 Xcode 里选择自己的签名团队
+2. 构建并运行 `codexBar` target
 
-## Roadmap
+## 后续计划
 
-- Better provider-specific pricing configuration
-- Cleaner provider/account billing attribution
-- Improved OpenAI account import from existing Codex auth
-- More polished detached settings windows
+- 更合理的 provider 单价配置
+- 更清晰的 provider / account 成本归因
+- 更顺手的 OpenAI 账号导入方式
+- 更稳定的状态栏交互和设置窗口
 
-## Acknowledgements
+## 致谢
 
-CodexAppBar was built with ideas and adapted implementation from these MIT-licensed projects:
+这个项目参考并改造了下面两个 MIT 许可证项目中的思路与部分实现：
 
 - [xmasdong/codexbar](https://github.com/xmasdong/codexbar)
 - [steipete/CodexBar](https://github.com/steipete/CodexBar)
 
-See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for attribution details.
+详细说明见：
+
+- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 
 ## License
 
 [MIT](LICENSE)
+
+<details>
+<summary>English</summary>
+
+## Overview
+
+CodexAppBar is a macOS menu bar utility for managing multiple OpenAI accounts and multiple OpenAI-compatible providers while keeping a shared `~/.codex` session pool.
+
+It is intended for users who want faster switching between:
+
+- OpenAI OAuth accounts
+- custom OpenAI-compatible providers
+- multiple API keys under the same provider
+
+Instead of splitting session storage, CodexAppBar synchronizes the selected provider/account into:
+
+- `~/.codex/config.toml`
+- `~/.codex/auth.json`
+
+while keeping Codex Desktop on the same shared session history.
+
+## Highlights
+
+- Multiple OpenAI OAuth accounts
+- Custom OpenAI-compatible providers
+- Multiple API-key accounts per provider
+- Shared `~/.codex` history model
+- Local token and cost history from Codex session logs
+
+## Notes
+
+- This repository does not bundle any private provider, API key, or personal account configuration.
+- Cost values are estimates derived from local session logs and pricing tables.
+- For custom OpenAI-compatible providers, displayed dollar amounts may differ from actual upstream billing.
+
+</details>
 
