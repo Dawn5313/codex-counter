@@ -134,6 +134,14 @@ final class AppLifecycleObserver: NSObject, NSApplicationDelegate {
         AppLifecycleDiagnostics.shared.beginSession()
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        Task { @MainActor in
+            for url in urls {
+                CodexBarURLRouter.handle(url)
+            }
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         AppLifecycleDiagnostics.shared.markTermination(reason: "applicationWillTerminate")
     }

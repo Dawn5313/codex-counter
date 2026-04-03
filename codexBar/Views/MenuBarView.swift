@@ -126,6 +126,14 @@ struct MenuBarView: View {
             guard isCostPanelPresented else { return }
             showCostPanel()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .openAILoginDidSucceed)) { notification in
+            showError = nil
+            showSuccess = notification.userInfo?["message"] as? String ?? "Saved OpenAI account."
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openAILoginDidFail)) { notification in
+            showSuccess = nil
+            showError = notification.userInfo?["message"] as? String ?? "OpenAI login failed."
+        }
         .onAppear {
             store.markActiveAccount()
             isProvidersExpanded = false
@@ -312,6 +320,8 @@ struct MenuBarView: View {
                             .buttonStyle(.borderedProminent)
                             .controlSize(.mini)
                             .font(.system(size: 10, weight: .medium))
+                            .accessibilityLabel("Login OpenAI Header Button")
+                            .accessibilityIdentifier("codexbar.login-openai.header")
                         }
 
                         if store.accounts.isEmpty {
@@ -419,6 +429,8 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.borderless)
                 .help(L.addAccount)
+                .accessibilityLabel("Login OpenAI Toolbar Button")
+                .accessibilityIdentifier("codexbar.login-openai.toolbar")
 
                 Button {
                     openAddProviderWindow()
@@ -616,47 +628,7 @@ struct MenuBarView: View {
     }
 
     private func startOAuthLogin() {
-        oauth.startOAuth { result in
-            switch result {
-            case .success(let completion):
-                store.load()
-                Task { await WhamService.shared.refreshOne(account: completion.account, store: store) }
-                showSuccess = completion.active
-                    ? "Updated Codex configuration. Changes apply to new sessions."
-                    : "Saved OpenAI account."
-                DetachedWindowPresenter.shared.close(id: "oauth-login")
-            case .failure(let error):
-                showError = error.localizedDescription
-            }
-        }
-        openOAuthWindow()
-    }
-
-    private func openOAuthWindow() {
-        DetachedWindowPresenter.shared.show(
-            id: "oauth-login",
-            title: "OpenAI OAuth",
-            size: CGSize(width: 560, height: 420)
-        ) {
-            OpenAIManualOAuthSheet(
-                authURL: oauth.pendingAuthURL ?? "",
-                isAuthenticating: oauth.isAuthenticating,
-                errorMessage: oauth.errorMessage
-            ) { input in
-                oauth.completeOAuth(from: input)
-            } onOpenBrowser: {
-                if let authURL = oauth.pendingAuthURL, let url = URL(string: authURL) {
-                    NSWorkspace.shared.open(url)
-                }
-            } onCopyLink: {
-                guard let authURL = oauth.pendingAuthURL else { return }
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(authURL, forType: .string)
-            } onCancel: {
-                oauth.cancel()
-                DetachedWindowPresenter.shared.close(id: "oauth-login")
-            }
-        }
+        OpenAILoginCoordinator.shared.start()
     }
 
     private func openAddProviderWindow() {

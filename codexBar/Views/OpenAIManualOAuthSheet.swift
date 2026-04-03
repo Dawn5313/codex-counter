@@ -40,8 +40,12 @@ struct OpenAIManualOAuthSheet: View {
             HStack {
                 Button("Open Browser", action: onOpenBrowser)
                     .buttonStyle(.borderedProminent)
+                    .accessibilityLabel("Open Browser")
+                    .accessibilityIdentifier("codexbar.oauth.open-browser")
                 Button("Copy Link", action: onCopyLink)
                     .buttonStyle(.bordered)
+                    .accessibilityLabel("Copy Login Link")
+                    .accessibilityIdentifier("codexbar.oauth.copy-link")
             }
 
             TextEditor(text: $callbackInput)
@@ -52,6 +56,9 @@ struct OpenAIManualOAuthSheet: View {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.secondary.opacity(0.25), lineWidth: 1)
                 )
+                .accessibilityLabel("OAuth Callback Input")
+                .accessibilityIdentifier("codexbar.oauth.callback-input")
+                .accessibilityHint("Paste the localhost callback URL or OAuth code here.")
 
             if let errorMessage, !errorMessage.isEmpty {
                 Text(errorMessage)
@@ -64,11 +71,15 @@ struct OpenAIManualOAuthSheet: View {
                 Button("Cancel") {
                     onCancel()
                 }
+                .accessibilityLabel("Cancel Login")
+                .accessibilityIdentifier("codexbar.oauth.cancel")
                 Button("Complete Login") {
                     onComplete(callbackInput)
                 }
                 .buttonStyle(.borderedProminent)
                 .disabled(callbackInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !isAuthenticating)
+                .accessibilityLabel("Complete Login")
+                .accessibilityIdentifier("codexbar.oauth.complete-login")
             }
         }
         .padding(16)
