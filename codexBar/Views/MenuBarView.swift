@@ -393,16 +393,21 @@ struct MenuBarView: View {
                 Button {
                     Task { await refresh(announceResult: true) }
                 } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                        .animation(
-                            isRefreshing
-                                ? .linear(duration: 0.8).repeatForever(autoreverses: false)
-                                : .default,
-                            value: isRefreshing
-                        )
+                    Group {
+                        if isRefreshing {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 11, weight: .semibold))
+                        }
+                    }
+                    .frame(width: 16, height: 16)
                 }
                 .buttonStyle(.borderless)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+                .help(L.refreshUsage)
                 .foregroundColor(isRefreshing ? .accentColor : .secondary)
                 .disabled(isRefreshing)
             }
