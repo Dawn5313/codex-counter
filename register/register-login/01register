@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# =============================================================================
+# 01register - 批量注册 OpenAI 账号（不登录 Codexbar）
+#
+# 用法:
+#   ./01register [数量]
+#   COUNT=50 ./01register
+#   INTERVAL_SECS=180 ./01register 20
+#
+# 环境变量:
+#   COUNT          - 注册账号数量，默认 10
+#   INTERVAL_SECS  - 每次注册间隔秒数，默认 10
+#   CSV_PATH       - codex.csv 路径，默认 ../codex.csv
+# =============================================================================
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+HIDE_MY_EMAIL_SCRIPT="$ROOT_DIR/chatgpt-anon-register/scripts/create_hide_my_email.sh"
+REGISTER_SCRIPT="$ROOT_DIR/chatgpt-anon-register/scripts/register_chatgpt.sh"
+CSV_SHADOW_HELPER="$ROOT_DIR/scripts/codex_csv_shadow.sh"
+
+COUNT="${COUNT:-${1:-10}}"
+INTERVAL_SECS="${INTERVAL_SECS:-10}"
+CSV_PATH="${CSV_PATH:-$ROOT_DIR/codex.csv}"
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf '❌ 缺少命令: %s\n' "$1" >&2
+    exit 127
+  }
+}
+
+ensure_csv_header() {
+  python3 - "$CSV_PATH" <<'PY'
+import csv, os, sys
+path = sys.argv[1]
+header = ["email", "password", "status", "url"]
+if not os.path.exists(path):
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        csv.writer(fh).writerow(header)
+    raise SystemExit(0)
+with open(path, "r", encoding="utf-8", newline="") as fh:
+    rows = list(csv.reader(fh))
+if not rows:
+    rows = [header]
+elif rows[0] not in (header, ["email", "password", "status"]):
+    rows.insert(0, header)
+if rows[0] == ["email", "password", "status"]:
+    rows[0] = header
+for row in rows[1:]:
+    while len(row) < 4:
+        row.append("")
+with open(path, "w", encoding="utf-8", newline="") as fh:
+    csv.writer(fh).writerows(rows)
+PY
+}
+
+upsert_csv_row() {
+  local email="$1" password="$2" status="$3" url="${4:-}"
+  python3 - "$CSV_PATH" "$email" "$password" "$status" "$url" <<'PY'
+import csv, sys
+path, email, password, status, url = sys.argv[1:]
+with open(path, "r", encoding="utf-8", newline="") as fh:
+    rows = list(csv.reader(fh))
+if not rows:
+    rows = [["email", "password", "status", "url"]]
+target_index = None
+if email:
+    for idx in range(len(rows) - 1, 0, -1):
+        row = rows[idx]
+        while len(row) < 4: row.append("")
+        if row[0] == email:
+            target_index = idx; break
+if target_index is None:
+    rows.append([email, password, status, url])
+else:
+    existing = rows[target_index]
+    while len(existing) < 4: existing.append("")
+    rows[target_index] = [
+        email or existing[0],
+        password if password != "" else existing[1],
+        status if status != "" else existing[2],
+        url if url != "" else existing[3],
+    ]
+with open(path, "w", encoding="utf-8", newline="") as fh:
+    csv.writer(fh).writerows(rows)
+PY
+}
+
+require_cmd bash require_cmd python3 require_cmd swift require_cmd playwright-cli
+source "$CSV_SHADOW_HELPER"
+codex_csv_begin_mutation "$CSV_PATH"
+ensure_csv_header
+
+printf '========================================\n'
+printf '🚀 开始批量注册 OpenAI 账号\n'
+printf '📋 目标数量: %s\n' "$COUNT"
+printf '⏱  注册间隔: %s 秒\n' "$INTERVAL_SECS"
+printf '📁 CSV 路径: %s\n' "$CSV_PATH"
+printf '========================================\n'
+
+SUCCESS=0
+FAILED=0
+
+for i in $(seq 1 "$COUNT"); do
+  printf '\n[%s/%s] 开始注册...\n' "$i" "$COUNT"
+
+  # 1. 生成 Hide My Email 别名
+  RELAY_EMAIL="$("$HIDE_MY_EMAIL_SCRIPT" 2>/dev/null)" || true
+  if [[ -z "$RELAY_EMAIL" ]]; then
+    printf '❌ [%s/%s] 创建 iCloud 邮箱失败\n' "$i" "$COUNT" >&2
+    upsert_csv_row "" "" "hme_failed" ""
+    ((FAILED++))
+    continue
+  fi
+  printf '📧 生成邮箱: %s\n' "$RELAY_EMAIL"
+
+  # 2. 注册 ChatGPT/OpenAI
+  REGISTER_OUTPUT="$(RELAY_EMAIL="$RELAY_EMAIL" "$REGISTER_SCRIPT" 2>&1)" && EXIT_CODE=0 || EXIT_CODE=$?
+
+  REG_EMAIL="$(printf '%s\n' "$REGISTER_OUTPUT" | sed -n 's/^REGISTERED_EMAIL=//p' | tail -n 1)"
+  REG_PASSWORD="$(printf '%s\n' "$REGISTER_OUTPUT" | sed -n 's/^PASSWORD=//p' | tail -n 1)"
+  REG_STATUS="$(printf '%s\n' "$REGISTER_OUTPUT" | sed -n 's/^REGISTRATION_STATUS=//p' | tail -n 1)"
+  REG_METHOD="$(printf '%s\n' "$REGISTER_OUTPUT" | sed -n 's/^AUTH_METHOD=//p' | tail -n 1)"
+
+  if [[ -n "$REG_EMAIL" && "$EXIT_CODE" -eq 0 ]]; then
+    upsert_csv_row "$REG_EMAIL" "$REG_PASSWORD" "registered" ""
+    printf '✅ [%s/%s] 注册成功 | %s | 方式: %s\n' "$i" "$COUNT" "$REG_EMAIL" "${REG_METHOD:-unknown}"
+    ((SUCCESS++))
+  else
+    upsert_csv_row "$RELAY_EMAIL" "" "registration_failed" ""
+    printf '❌ [%s/%s] 注册失败\n' "$i" "$COUNT" >&2
+    ((FAILED++))
+  fi
+
+  # 间隔
+  if (( i < COUNT )); then
+    printf '⏳ 等待 %s 秒...\n' "$INTERVAL_SECS"
+    sleep "$INTERVAL_SECS"
+  fi
+done
+
+codex_csv_sync_shadow "$CSV_PATH"
+
+printf '\n========================================\n'
+printf '📊 注册完成\n'
+printf '✅ 成功: %s\n' "$SUCCESS"
+printf '❌ 失败: %s\n' "$FAILED"
+printf '📁 结果已写入: %s\n' "$CSV_PATH"
+printf '========================================\n'
+printf '\n下一步: 运行 ./02login 将已注册的账号登录到 Codexbar\n'
+
+if (( FAILED > 0 )); then
+  exit 1
+fi
