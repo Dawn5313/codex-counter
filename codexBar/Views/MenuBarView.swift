@@ -56,17 +56,44 @@ private struct AdaptiveMenuScrollContainer<Content: View>: NSViewRepresentable {
 private struct ViewReferenceReader: NSViewRepresentable {
     let onResolve: (NSView) -> Void
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        DispatchQueue.main.async {
-            onResolve(view)
-        }
-        return view
+    func makeNSView(context: Context) -> ReporterView {
+        ReporterView(onResolve: onResolve)
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async {
-            onResolve(nsView)
+    func updateNSView(_ nsView: ReporterView, context: Context) {
+        nsView.onResolve = onResolve
+        nsView.resolveIfAttached()
+    }
+
+    final class ReporterView: NSView {
+        var onResolve: (NSView) -> Void
+
+        init(onResolve: @escaping (NSView) -> Void) {
+            self.onResolve = onResolve
+            super.init(frame: .zero)
+        }
+
+        @available(*, unavailable)
+        required init?(coder: NSCoder) {
+            fatalError("init(coder:) has not been implemented")
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            resolveIfAttached()
+        }
+
+        override func layout() {
+            super.layout()
+            resolveIfAttached()
+        }
+
+        func resolveIfAttached() {
+            guard window != nil else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.window != nil else { return }
+                self.onResolve(self)
+            }
         }
     }
 }
@@ -227,6 +254,7 @@ struct MenuBarView: View {
     @EnvironmentObject var oauth: OAuthManager
 
     private let costPanelID = "cost-details-hover-panel"
+    private let configUpdateSuccessMessage = "Updated Codex configuration. Changes apply to new sessions."
     private let usageRefreshInterval = OpenAIUsagePollingService.defaultRefreshInterval
     private let visibleOpenAIAccountLimit = 5
     private let openAIAccountsInitialHeight: CGFloat = 260
@@ -284,6 +312,11 @@ struct MenuBarView: View {
         let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
         let visibleHeight = screen?.visibleFrame.height ?? 900
         return max(260, visibleHeight - 40)
+    }
+
+    private var lowerSuccessMessage: String? {
+        guard let showSuccess else { return nil }
+        return showSuccess == configUpdateSuccessMessage ? nil : showSuccess
     }
 
     var body: some View {
@@ -385,9 +418,6 @@ struct MenuBarView: View {
                     Text("Model: \(store.activeModel)")
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
-                    Text("Changes apply to new sessions.")
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
@@ -426,62 +456,16 @@ struct MenuBarView: View {
                         setCostSummaryHover(hovering)
                     }
 
-                    if !store.customProviders.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.16)) {
-                                    isProvidersExpanded.toggle()
-                                }
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Text("Providers")
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundColor(.secondary)
-
-                                    Spacer()
-
-                                    Text("\(store.customProviders.count)")
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundColor(.secondary)
-
-                                    Image(systemName: isProvidersExpanded ? "chevron.down" : "chevron.right")
-                                        .font(.system(size: 9, weight: .semibold))
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding(.leading, 4)
-                                .padding(.trailing, 12)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-
-                            if isProvidersExpanded {
-                                ForEach(store.customProviders) { provider in
-                                    CompatibleProviderRowView(
-                                        provider: provider,
-                                        isActiveProvider: store.activeProvider?.id == provider.id,
-                                        activeAccountId: provider.activeAccountId
-                                    ) { account in
-                                        activateCompatibleProvider(providerID: provider.id, accountID: account.id)
-                                    } onAddAccount: {
-                                        openAddProviderAccountWindow(provider: provider)
-                                    } onDeleteAccount: { account in
-                                        deleteCompatibleAccount(providerID: provider.id, accountID: account.id)
-                                    } onDeleteProvider: {
-                                        deleteProvider(providerID: provider.id)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     openAIAccountsSection
+
+                    providersSection
 
                 }
                 .padding(.horizontal, 8)
                 .padding(.vertical, 6)
             }
 
-            if let success = showSuccess {
+            if let success = lowerSuccessMessage {
                 Divider()
                 HStack {
                     Image(systemName: "checkmark.circle.fill")
@@ -627,6 +611,57 @@ struct MenuBarView: View {
     }
 
     @ViewBuilder
+    private var providersSection: some View {
+        if !store.customProviders.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.16)) {
+                        isProvidersExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text("Providers")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        Text("\(store.customProviders.count)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.secondary)
+
+                        Image(systemName: isProvidersExpanded ? "chevron.down" : "chevron.right")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.leading, 4)
+                    .padding(.trailing, 12)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if isProvidersExpanded {
+                    ForEach(store.customProviders) { provider in
+                        CompatibleProviderRowView(
+                            provider: provider,
+                            isActiveProvider: store.activeProvider?.id == provider.id,
+                            activeAccountId: provider.activeAccountId
+                        ) { account in
+                            activateCompatibleProvider(providerID: provider.id, accountID: account.id)
+                        } onAddAccount: {
+                            openAddProviderAccountWindow(provider: provider)
+                        } onDeleteAccount: { account in
+                            deleteCompatibleAccount(providerID: provider.id, accountID: account.id)
+                        } onDeleteProvider: {
+                            deleteProvider(providerID: provider.id)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
     private func openAIAccountGroupsView(_ groups: [OpenAIAccountGroup]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             ForEach(groups) { group in
@@ -702,8 +737,11 @@ struct MenuBarView: View {
     }
 
     private func resolveCostSummaryAnchor(_ view: NSView) {
-        guard self.costSummaryAnchorView !== view else { return }
-        self.costSummaryAnchorView = view
+        if self.costSummaryAnchorView !== view {
+            self.costSummaryAnchorView = view
+        }
+        guard isCostPanelPresented else { return }
+        showCostPanel()
     }
 
     private func setCostSummaryHover(_ hovering: Bool) {
@@ -788,7 +826,7 @@ struct MenuBarView: View {
         do {
             try store.activate(account)
             store.refreshLocalCostSummary()
-            showSuccess = "Updated Codex configuration. Changes apply to new sessions."
+            showSuccess = configUpdateSuccessMessage
             Task { @MainActor in
                 OpenAIUsagePollingService.shared.refreshNow()
             }
@@ -801,7 +839,7 @@ struct MenuBarView: View {
         do {
             try store.activateCustomProvider(providerID: providerID, accountID: accountID)
             store.refreshLocalCostSummary()
-            showSuccess = "Updated Codex configuration. Changes apply to new sessions."
+            showSuccess = configUpdateSuccessMessage
         } catch {
             showError = error.localizedDescription
         }
@@ -838,7 +876,7 @@ struct MenuBarView: View {
             AddProviderSheet { label, baseURL, accountLabel, apiKey in
                 do {
                     try store.addCustomProvider(label: label, baseURL: baseURL, accountLabel: accountLabel, apiKey: apiKey)
-                    showSuccess = "Updated Codex configuration. Changes apply to new sessions."
+                    showSuccess = configUpdateSuccessMessage
                     DetachedWindowPresenter.shared.close(id: "add-provider")
                 } catch {
                     showError = error.localizedDescription
@@ -958,7 +996,7 @@ struct MenuBarView: View {
                 store.load()
                 Task { await WhamService.shared.refreshOne(account: completion.account, store: store) }
                 showSuccess = completion.active
-                    ? "Updated Codex configuration. Changes apply to new sessions."
+                    ? configUpdateSuccessMessage
                     : "Saved OpenAI account."
             case .failure(let error):
                 showError = error.localizedDescription
