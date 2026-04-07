@@ -18,6 +18,16 @@ struct OAuthAccountSummary: Codable, Equatable {
     }
 }
 
+struct OAuthAccountBatchImportResult: Equatable {
+    let addedCount: Int
+    let updatedCount: Int
+    let activeChanged: Bool
+    let providerChanged: Bool
+    let preservedCompatibleProvider: Bool
+    let synchronized: Bool
+    let importedAccountIDs: [String]
+}
+
 struct CodexBarOAuthAccountService {
     private let configStore: CodexBarConfigStore
     private let syncService: CodexSyncService
@@ -42,6 +52,10 @@ struct CodexBarOAuthAccountService {
                 active: $0.isActive
             )
         }
+    }
+
+    func exportAccounts() throws -> [TokenAccount] {
+        try self.configStore.loadOrMigrate().oauthTokenAccounts()
     }
 
     func importAccount(_ account: TokenAccount, activate: Bool) throws -> OAuthAccountMutationResult {
@@ -88,9 +102,76 @@ struct CodexBarOAuthAccountService {
         return OAuthAccountMutationResult(account: tokenAccount, active: true, synchronized: true)
     }
 
+    func importAccounts(_ accounts: [TokenAccount], activeAccountID: String?) throws -> OAuthAccountBatchImportResult {
+        guard activeAccountID == nil || accounts.contains(where: { $0.accountId == activeAccountID }) else {
+            throw TokenStoreError.accountNotFound
+        }
+
+        var config = try self.configStore.loadOrMigrate()
+        let previousProviderID = config.active.providerId
+        let previousAccountID = config.active.accountId
+        let previousProviderKind = config.activeProvider()?.kind
+        let existingAccountIDs = Set(config.oauthProvider()?.accounts.compactMap(\.openAIAccountId) ?? [])
+        let addedCount = accounts.reduce(into: 0) { partialResult, account in
+            if existingAccountIDs.contains(account.accountId) == false {
+                partialResult += 1
+            }
+        }
+
+        for account in accounts {
+            _ = config.upsertOAuthAccount(account, activate: false)
+        }
+
+        var preservedCompatibleProvider = false
+        if let activeAccountID {
+            if previousProviderKind == .openAICompatible {
+                preservedCompatibleProvider = true
+                try config.setOAuthPreferredAccount(accountID: activeAccountID)
+            } else {
+                _ = try config.activateOAuthAccount(accountID: activeAccountID)
+            }
+        }
+
+        try self.configStore.save(config)
+
+        let synchronized = self.shouldSynchronize(config: config)
+        if synchronized {
+            try self.syncService.synchronize(config: config)
+        }
+
+        let providerChanged = previousProviderID != config.active.providerId
+        let activeChanged = previousAccountID != config.active.accountId
+        if providerChanged || activeChanged {
+            try self.switchJournalStore.appendActivation(
+                providerID: config.active.providerId,
+                accountID: config.active.accountId,
+                previousAccountID: previousAccountID
+            )
+        }
+
+        return OAuthAccountBatchImportResult(
+            addedCount: addedCount,
+            updatedCount: accounts.count - addedCount,
+            activeChanged: activeChanged,
+            providerChanged: providerChanged,
+            preservedCompatibleProvider: preservedCompatibleProvider,
+            synchronized: synchronized,
+            importedAccountIDs: accounts.map(\.accountId)
+        )
+    }
+
     private func makeTokenAccount(from stored: CodexBarProviderAccount, config: CodexBarConfig) -> TokenAccount? {
         let provider = config.oauthProvider()
         let isActive = config.active.providerId == provider?.id && config.active.accountId == stored.id
         return stored.asTokenAccount(isActive: isActive)
+    }
+
+    private func shouldSynchronize(config: CodexBarConfig) -> Bool {
+        guard let provider = config.activeProvider(),
+              provider.kind == .openAIOAuth,
+              config.activeAccount() != nil else {
+            return false
+        }
+        return true
     }
 }

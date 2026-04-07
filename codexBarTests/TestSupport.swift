@@ -71,6 +71,41 @@ class CodexBarTestCase: XCTestCase {
         return "\(self.base64URL(header)).\(self.base64URL(data)).signature"
     }
 
+    func makeOAuthAccount(
+        accountID: String,
+        email: String,
+        refreshToken: String? = nil,
+        isActive: Bool = false,
+        planType: String = "plus"
+    ) throws -> TokenAccount {
+        let accessToken = try self.makeJWT(
+            payload: [
+                "exp": Date(timeIntervalSinceNow: 3_600).timeIntervalSince1970,
+                "https://api.openai.com/auth": [
+                    "chatgpt_account_id": accountID,
+                    "chatgpt_plan_type": planType,
+                ],
+            ]
+        )
+        let idToken = try self.makeJWT(
+            payload: [
+                "email": email,
+                "https://api.openai.com/auth": [
+                    "chatgpt_subscription_active_until": "2026-12-31T00:00:00Z",
+                ],
+            ]
+        )
+        var account = AccountBuilder.build(
+            from: OAuthTokens(
+                accessToken: accessToken,
+                refreshToken: refreshToken ?? "refresh-\(accountID)",
+                idToken: idToken
+            )
+        )
+        account.isActive = isActive
+        return account
+    }
+
     private func base64URL(_ data: Data) -> String {
         data.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")

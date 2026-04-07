@@ -33,6 +33,69 @@ enum L {
     static var addAccountHint: String  { zh ? "点击下方 + 添加账号"   : "Tap + below to add an account" }
     static var refreshUsage: String    { zh ? "刷新用量"            : "Refresh Usage" }
     static var addAccount: String      { zh ? "添加账号"            : "Add Account" }
+    static var openAICSVToolbar: String { zh ? "导入或导出 OpenAI CSV" : "Import or Export OpenAI CSV" }
+    static var exportOpenAICSVAction: String { zh ? "导出 OpenAI CSV…" : "Export OpenAI CSV…" }
+    static var importOpenAICSVAction: String { zh ? "导入 OpenAI CSV…" : "Import OpenAI CSV…" }
+    static var openAICSVExportPrompt: String { zh ? "导出" : "Export" }
+    static var openAICSVImportPrompt: String { zh ? "导入" : "Import" }
+    static var openAICSVRiskTitle: String { zh ? "导出将包含敏感 OAuth token" : "Export Includes Sensitive OAuth Tokens" }
+    static var openAICSVRiskMessage: String {
+        zh
+            ? "导出的 CSV 将包含 access_token、refresh_token 和 id_token。请仅保存到受信任位置，避免分享或同步到不安全环境。"
+            : "The exported CSV includes access_token, refresh_token, and id_token. Save it only to a trusted location and avoid sharing or syncing it to insecure destinations."
+    }
+    static var openAICSVRiskConfirm: String { zh ? "继续导出" : "Export Anyway" }
+    static var noOpenAIAccountsToExport: String {
+        zh ? "没有可导出的 OpenAI 账号" : "No OpenAI accounts available to export"
+    }
+    static func openAICSVExportSucceeded(_ count: Int) -> String {
+        zh ? "已导出 \(count) 个 OpenAI 账号到 CSV。" : "Exported \(count) OpenAI account\(count == 1 ? "" : "s") to CSV."
+    }
+    static func openAICSVImportSucceeded(
+        added: Int,
+        updated: Int,
+        activeChanged: Bool,
+        providerChanged: Bool,
+        preservedCompatibleProvider: Bool
+    ) -> String {
+        let prefix = zh
+            ? "已导入 OpenAI CSV：新增 \(added) 个，覆盖 \(updated) 个。"
+            : "Imported OpenAI CSV: \(added) added, \(updated) updated."
+        let suffix: String
+        if preservedCompatibleProvider {
+            suffix = zh ? " 当前使用 provider 保持不变。" : " The current provider was left unchanged."
+        } else if providerChanged {
+            suffix = zh ? " 当前 provider 已切换到 OpenAI。" : " The current provider was switched to OpenAI."
+        } else if activeChanged {
+            suffix = zh ? " 当前 OpenAI 账号已更新。" : " The current OpenAI account was updated."
+        } else {
+            suffix = zh ? " 当前 active 选择未变化。" : " The current active selection was unchanged."
+        }
+        return prefix + suffix
+    }
+    static var openAICSVEmptyFile: String { zh ? "CSV 为空，或只有表头。" : "The CSV is empty or only contains a header." }
+    static var openAICSVMissingColumns: String { zh ? "CSV 缺少必需列。" : "The CSV is missing required columns." }
+    static var openAICSVUnsupportedVersion: String { zh ? "不支持的 CSV 版本。" : "Unsupported CSV format version." }
+    static func openAICSVInvalidRow(_ row: Int) -> String {
+        zh ? "CSV 第 \(row) 行格式无效。" : "CSV row \(row) has an invalid format."
+    }
+    static func openAICSVMissingRequiredValue(_ row: Int) -> String {
+        zh ? "CSV 第 \(row) 行缺少必填字段。" : "CSV row \(row) is missing required fields."
+    }
+    static func openAICSVInvalidAccount(_ row: Int) -> String {
+        zh ? "CSV 第 \(row) 行的 token 校验失败。" : "CSV row \(row) failed token validation."
+    }
+    static func openAICSVAccountIDMismatch(_ row: Int) -> String {
+        zh ? "CSV 第 \(row) 行的 account_id 校验失败。" : "CSV row \(row) failed account_id validation."
+    }
+    static func openAICSVEmailMismatch(_ row: Int) -> String {
+        zh ? "CSV 第 \(row) 行的 email 校验失败。" : "CSV row \(row) failed email validation."
+    }
+    static var openAICSVDuplicateAccounts: String { zh ? "CSV 中存在重复的 account_id。" : "The CSV contains duplicate account_id values." }
+    static var openAICSVMultipleActiveAccounts: String { zh ? "CSV 中包含多个 is_active=true 的账号。" : "The CSV contains multiple accounts marked as is_active=true." }
+    static func openAICSVInvalidActiveValue(_ row: Int) -> String {
+        zh ? "CSV 第 \(row) 行的 is_active 值无效。" : "CSV row \(row) has an invalid is_active value."
+    }
     static var quit: String            { zh ? "退出"               : "Quit" }
     static var switchAccount: String    { zh ? "切换账号"            : "Switch Account" }
     static var switchTitle: String     { zh ? "切换账号"            : "Switch Account" }

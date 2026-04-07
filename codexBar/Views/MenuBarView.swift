@@ -258,6 +258,9 @@ struct MenuBarView: View {
     private let visibleOpenAIAccountLimit = 5
     private let openAIAccountsInitialHeight: CGFloat = 260
     private let sessionAttributionService = OpenAILiveSessionAttributionService()
+    private let oauthAccountService = CodexBarOAuthAccountService()
+    private let openAIAccountCSVService = OpenAIAccountCSVService()
+    private let openAIAccountCSVPanelService = OpenAIAccountCSVPanelService()
 
     @State private var isRefreshing = false
     @State private var showError: String?
@@ -294,8 +297,12 @@ struct MenuBarView: View {
     private var groupedAccounts: [OpenAIAccountGroup] {
         OpenAIAccountListLayout.groupedAccounts(
             from: store.accounts,
-            attribution: self.sessionAttribution
+            summary: self.liveSessionSummary
         )
+    }
+
+    private var liveSessionSummary: OpenAILiveSessionAttribution.LiveSummary {
+        self.sessionAttribution.liveSummary(now: self.now)
     }
 
     private var visibleGroupedAccounts: [OpenAIAccountGroup] {
@@ -315,7 +322,7 @@ struct MenuBarView: View {
     }
 
     private var nextUseSummaryDetail: String {
-        let inUseSummary = OpenAIAccountPresentation.inUseSummaryText(attribution: self.sessionAttribution)
+        let inUseSummary = OpenAIAccountPresentation.inUseSummaryText(summary: self.liveSessionSummary)
         return "\(inUseSummary) · Model: \(store.activeModel)"
     }
 
@@ -358,6 +365,7 @@ struct MenuBarView: View {
             countdownTimerConnection = countdownTimer.connect()
             store.markActiveAccount()
             isProvidersExpanded = false
+            refreshSessionAttribution()
         }
         .onDisappear {
             sessionAttributionRefreshSequence += 1
@@ -548,6 +556,22 @@ struct MenuBarView: View {
 
                 Spacer()
 
+                Menu {
+                    Button(L.exportOpenAICSVAction) {
+                        exportOpenAIAccountsCSV()
+                    }
+                    Button(L.importOpenAICSVAction) {
+                        importOpenAIAccountsCSV()
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down.circle")
+                        .font(.system(size: 12))
+                }
+                .menuStyle(.borderlessButton)
+                .accessibilityLabel(L.openAICSVToolbar)
+                .accessibilityIdentifier("codexbar.openai-csv.toolbar")
+                .help(L.openAICSVToolbar)
+
                 Button {
                     startOAuthLogin()
                 } label: {
@@ -723,7 +747,7 @@ struct MenuBarView: View {
                     ForEach(group.accounts) { account in
                         let rowState = OpenAIAccountPresentation.rowState(
                             for: account,
-                            attribution: self.sessionAttribution
+                            summary: self.liveSessionSummary
                         )
                         AccountRowView(
                             account: account,
@@ -908,6 +932,60 @@ struct MenuBarView: View {
         OpenAILoginCoordinator.shared.start()
     }
 
+    private func exportOpenAIAccountsCSV() {
+        do {
+            let accounts = try self.oauthAccountService.exportAccounts()
+            guard accounts.isEmpty == false else {
+                self.showSuccess = nil
+                self.showError = L.noOpenAIAccountsToExport
+                return
+            }
+
+            guard let exportURL = self.openAIAccountCSVPanelService.requestExportURL() else {
+                return
+            }
+
+            let csv = self.openAIAccountCSVService.makeCSV(from: accounts)
+            try csv.write(to: exportURL, atomically: true, encoding: .utf8)
+            self.showError = nil
+            self.showSuccess = L.openAICSVExportSucceeded(accounts.count)
+        } catch {
+            self.showSuccess = nil
+            self.showError = error.localizedDescription
+        }
+    }
+
+    private func importOpenAIAccountsCSV() {
+        do {
+            guard let importURL = self.openAIAccountCSVPanelService.requestImportURL() else {
+                return
+            }
+
+            let csvText = try String(contentsOf: importURL, encoding: .utf8)
+            let parsed = try self.openAIAccountCSVService.parseCSV(csvText)
+            let result = try self.oauthAccountService.importAccounts(
+                parsed.accounts,
+                activeAccountID: parsed.activeAccountID
+            )
+
+            self.store.load()
+            self.store.refreshLocalCostSummary()
+            self.refreshSessionAttribution()
+            self.showError = nil
+            self.showSuccess = L.openAICSVImportSucceeded(
+                added: result.addedCount,
+                updated: result.updatedCount,
+                activeChanged: result.activeChanged,
+                providerChanged: result.providerChanged,
+                preservedCompatibleProvider: result.preservedCompatibleProvider
+            )
+            self.refreshImportedAccounts(accountIDs: result.importedAccountIDs)
+        } catch {
+            self.showSuccess = nil
+            self.showError = error.localizedDescription
+        }
+    }
+
     private func openAddProviderWindow() {
         DetachedWindowPresenter.shared.show(
             id: "add-provider",
@@ -1018,6 +1096,25 @@ struct MenuBarView: View {
         guard let message = outcome.errorMessage else { return nil }
         let label = account.email.isEmpty ? account.accountId : account.email
         return "\(label): \(message)"
+    }
+
+    private func refreshImportedAccounts(accountIDs: [String]) {
+        let importedAccountIDs = Set(accountIDs)
+        guard importedAccountIDs.isEmpty == false else { return }
+
+        let importedAccounts = self.store.accounts.filter { importedAccountIDs.contains($0.accountId) }
+        guard importedAccounts.isEmpty == false else { return }
+
+        Task {
+            await withTaskGroup(of: Void.self) { group in
+                for account in importedAccounts {
+                    group.addTask {
+                        _ = await WhamService.shared.refreshOne(account: account, store: self.store)
+                    }
+                }
+            }
+            await AutoRoutingCoordinator.shared.handleAccountInventoryChanged()
+        }
     }
 
     private func refreshSessionAttribution() {
