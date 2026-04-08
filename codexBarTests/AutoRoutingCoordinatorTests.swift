@@ -35,6 +35,47 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
         XCTAssertEqual(best?.accountId, "acct_high")
     }
 
+    func testBestCandidatePrefersWeightedPlusOverFreeWhenQuotaValueTies() {
+        let settings = CodexBarAutoRoutingSettings(enabled: true)
+        let free = self.makeAccount(
+            accountId: "acct_free",
+            planType: "free",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0
+        )
+        let plus = self.makeAccount(
+            accountId: "acct_plus",
+            planType: "plus",
+            primaryUsedPercent: 90,
+            secondaryUsedPercent: 90
+        )
+
+        let best = AutoRoutingPolicy.bestCandidate(from: [free, plus], settings: settings)
+
+        XCTAssertEqual(best?.accountId, "acct_plus")
+    }
+
+    func testBestCandidateTreatsUnknownPlanTypeAsFree() {
+        let settings = CodexBarAutoRoutingSettings(enabled: true)
+        let unknown = self.makeAccount(
+            accountId: "acct_unknown",
+            planType: "enterprise",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0
+        )
+        let plus = self.makeAccount(
+            accountId: "acct_plus",
+            planType: "plus",
+            primaryUsedPercent: 90,
+            secondaryUsedPercent: 90
+        )
+
+        let best = AutoRoutingPolicy.bestCandidate(from: [unknown, plus], settings: settings)
+
+        XCTAssertEqual(unknown.planQuotaMultiplier, 1.0)
+        XCTAssertEqual(best?.accountId, "acct_plus")
+    }
+
     func testBestCandidateRespectsPinnedUsableAccount() {
         let settings = CodexBarAutoRoutingSettings(enabled: true, pinnedAccountId: "acct_pinned")
         let pinned = self.makeAccount(accountId: "acct_pinned", primaryUsedPercent: 45, secondaryUsedPercent: 10)
@@ -87,6 +128,32 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
         XCTAssertEqual(decision?.reason, .autoThreshold)
     }
 
+    func testDecisionPromotesMixedPlanCandidateWhenCurrentIsDegraded() {
+        let settings = CodexBarAutoRoutingSettings(enabled: true)
+        let current = self.makeAccount(
+            accountId: "acct_current",
+            planType: "free",
+            primaryUsedPercent: 80,
+            secondaryUsedPercent: 0
+        )
+        let better = self.makeAccount(
+            accountId: "acct_better",
+            planType: "plus",
+            primaryUsedPercent: 90,
+            secondaryUsedPercent: 90
+        )
+
+        let decision = AutoRoutingPolicy.decision(
+            from: [current, better],
+            currentAccountID: "acct_current",
+            settings: settings,
+            fallbackReason: .startupBestAccount
+        )
+
+        XCTAssertEqual(decision?.account.accountId, "acct_better")
+        XCTAssertEqual(decision?.reason, .autoThreshold)
+    }
+
     func testHardFailoverReasonUsesUnavailableBeforeExhausted() {
         let unavailable = self.makeAccount(
             accountId: "acct_unavailable",
@@ -104,18 +171,21 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
         let settings = CodexBarAutoRoutingSettings(enabled: true)
         let suspended = self.makeAccount(
             accountId: "acct_suspended",
+            planType: "team",
             primaryUsedPercent: 10,
             secondaryUsedPercent: 10,
             isSuspended: true
         )
         let expired = self.makeAccount(
             accountId: "acct_expired",
+            planType: "plus",
             primaryUsedPercent: 10,
             secondaryUsedPercent: 10,
             tokenExpired: true
         )
         let exhausted = self.makeAccount(
             accountId: "acct_exhausted",
+            planType: "team",
             primaryUsedPercent: 100,
             secondaryUsedPercent: 0
         )
@@ -127,6 +197,24 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
         )
 
         XCTAssertEqual(best?.accountId, "acct_healthy")
+    }
+
+    func testUsageStatusThresholdsRemainUnchangedAcrossPlans() {
+        XCTAssertEqual(
+            self.makeAccount(accountId: "acct_ok_plus", planType: "plus", primaryUsedPercent: 79, secondaryUsedPercent: 0)
+                .usageStatus,
+            .ok
+        )
+        XCTAssertEqual(
+            self.makeAccount(accountId: "acct_warning_team", planType: "team", primaryUsedPercent: 80, secondaryUsedPercent: 0)
+                .usageStatus,
+            .warning
+        )
+        XCTAssertEqual(
+            self.makeAccount(accountId: "acct_exceeded_unknown", planType: "enterprise", primaryUsedPercent: 100, secondaryUsedPercent: 0)
+                .usageStatus,
+            .exceeded
+        )
     }
 
     func testHandleAppLaunchDoesNotAutoSwitchWhenCurrentIsDegraded() async throws {
@@ -312,6 +400,7 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
 
     private func makeAccount(
         accountId: String,
+        planType: String = "free",
         primaryUsedPercent: Double,
         secondaryUsedPercent: Double,
         tokenExpired: Bool = false,
@@ -323,6 +412,7 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
             accessToken: "access-\(accountId)",
             refreshToken: "refresh-\(accountId)",
             idToken: "id-\(accountId)",
+            planType: planType,
             primaryUsedPercent: primaryUsedPercent,
             secondaryUsedPercent: secondaryUsedPercent,
             isActive: false,

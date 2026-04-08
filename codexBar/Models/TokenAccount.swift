@@ -160,7 +160,7 @@ struct UsageWindowDisplay: Identifiable, Equatable {
     var id: String { "\(label)-\(limitWindowSeconds ?? -1)" }
 }
 
-enum UsageStatus {
+enum UsageStatus: Equatable {
     case ok, warning, exceeded, banned
 
     var color: String {
@@ -183,12 +183,31 @@ enum UsageStatus {
 }
 
 extension TokenAccount {
+    nonisolated var planQuotaMultiplier: Double {
+        switch self.planType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "plus":
+            return 10.0
+        case "team":
+            return 15.0
+        default:
+            return 1.0
+        }
+    }
+
     nonisolated var primaryRemainingPercent: Double {
         max(0, 100 - primaryUsedPercent)
     }
 
     nonisolated var secondaryRemainingPercent: Double {
         max(0, 100 - secondaryUsedPercent)
+    }
+
+    nonisolated var weightedPrimaryRemainingPercent: Double {
+        self.primaryRemainingPercent * self.planQuotaMultiplier
+    }
+
+    nonisolated var weightedSecondaryRemainingPercent: Double {
+        self.secondaryRemainingPercent * self.planQuotaMultiplier
     }
 
     nonisolated var sortBucket: OpenAIAccountSortBucket {

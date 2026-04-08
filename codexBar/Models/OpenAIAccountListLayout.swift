@@ -113,6 +113,18 @@ enum OpenAIAccountListLayout {
             return lhs.sortBucket.rawValue < rhs.sortBucket.rawValue
         }
 
+        if lhs.weightedPrimaryRemainingPercent != rhs.weightedPrimaryRemainingPercent {
+            return lhs.weightedPrimaryRemainingPercent > rhs.weightedPrimaryRemainingPercent
+        }
+
+        if lhs.weightedSecondaryRemainingPercent != rhs.weightedSecondaryRemainingPercent {
+            return lhs.weightedSecondaryRemainingPercent > rhs.weightedSecondaryRemainingPercent
+        }
+
+        if lhs.planQuotaMultiplier != rhs.planQuotaMultiplier {
+            return lhs.planQuotaMultiplier > rhs.planQuotaMultiplier
+        }
+
         if lhs.primaryRemainingPercent != rhs.primaryRemainingPercent {
             return lhs.primaryRemainingPercent > rhs.primaryRemainingPercent
         }

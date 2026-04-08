@@ -121,6 +121,98 @@ final class OpenAIAccountListLayoutTests: XCTestCase {
         XCTAssertEqual(grouped.map(\.email), ["high@example.com", "low@example.com"])
     }
 
+    func testMixedPlanWeightedQuotaTreatsPlusNinetyPercentLikeFreeZeroPercent() {
+        let free = makeAccount(
+            email: "free@example.com",
+            accountId: "acct_free",
+            planType: "free",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0
+        )
+        let plus = makeAccount(
+            email: "plus@example.com",
+            accountId: "acct_plus",
+            planType: "plus",
+            primaryUsedPercent: 90,
+            secondaryUsedPercent: 90
+        )
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(from: [free, plus])
+
+        XCTAssertEqual(grouped.map(\.email), ["plus@example.com", "free@example.com"])
+    }
+
+    func testMixedPlanWeightedQuotaGivesTeamOnePointFivePlusValue() {
+        let plus = makeAccount(
+            email: "plus@example.com",
+            accountId: "acct_plus",
+            planType: "plus",
+            primaryUsedPercent: 40,
+            secondaryUsedPercent: 40
+        )
+        let team = makeAccount(
+            email: "team@example.com",
+            accountId: "acct_team",
+            planType: "team",
+            primaryUsedPercent: 60,
+            secondaryUsedPercent: 60
+        )
+
+        XCTAssertEqual(plus.weightedPrimaryRemainingPercent, 600.0)
+        XCTAssertEqual(team.weightedPrimaryRemainingPercent, 600.0)
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(from: [plus, team])
+
+        XCTAssertEqual(grouped.map(\.email), ["team@example.com", "plus@example.com"])
+    }
+
+    func testUnknownPlanTypeFallsBackToFreeWeight() {
+        let unknown = makeAccount(
+            email: "unknown@example.com",
+            accountId: "acct_unknown",
+            planType: "enterprise",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0
+        )
+        let plus = makeAccount(
+            email: "plus@example.com",
+            accountId: "acct_plus",
+            planType: "plus",
+            primaryUsedPercent: 90,
+            secondaryUsedPercent: 90
+        )
+
+        XCTAssertEqual(unknown.planQuotaMultiplier, 1.0)
+        XCTAssertEqual(plus.planQuotaMultiplier, 10.0)
+        XCTAssertEqual(unknown.weightedPrimaryRemainingPercent, 100.0)
+        XCTAssertEqual(plus.weightedPrimaryRemainingPercent, 100.0)
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(from: [unknown, plus])
+        XCTAssertEqual(grouped.map(\.email), ["plus@example.com", "unknown@example.com"])
+    }
+
+    func testUnavailableAccountsDoNotBeatUsableAccountsBecauseOfPlanWeight() {
+        let healthyFree = makeAccount(
+            email: "free@example.com",
+            accountId: "acct_free",
+            planType: "free",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0
+        )
+        let suspendedTeam = makeAccount(
+            email: "team@example.com",
+            accountId: "acct_team",
+            planType: "team",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0,
+            isSuspended: true
+        )
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(from: [suspendedTeam, healthyFree])
+
+        XCTAssertEqual(grouped.map(\.email), ["free@example.com", "team@example.com"])
+    }
+
     func testExhaustedAccountsSinkToBottom() {
         let usable = makeAccount(
             email: "usable@example.com",
@@ -274,16 +366,22 @@ final class OpenAIAccountListLayoutTests: XCTestCase {
     private func makeAccount(
         email: String,
         accountId: String,
+        planType: String = "free",
         primaryUsedPercent: Double,
         secondaryUsedPercent: Double,
-        isActive: Bool = false
+        isActive: Bool = false,
+        isSuspended: Bool = false,
+        tokenExpired: Bool = false
     ) -> TokenAccount {
         TokenAccount(
             email: email,
             accountId: accountId,
+            planType: planType,
             primaryUsedPercent: primaryUsedPercent,
             secondaryUsedPercent: secondaryUsedPercent,
-            isActive: isActive
+            isActive: isActive,
+            isSuspended: isSuspended,
+            tokenExpired: tokenExpired
         )
     }
 }
