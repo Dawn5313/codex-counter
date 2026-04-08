@@ -31,62 +31,106 @@ extension OpenAIAccountGroup {
 enum OpenAIAccountListLayout {
     static let visibleGroupLimit = 4
 
-    nonisolated static func groupedAccounts(from accounts: [TokenAccount]) -> [OpenAIAccountGroup] {
-        Dictionary(grouping: accounts, by: \.email)
+    nonisolated static func groupedAccounts(
+        from accounts: [TokenAccount],
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init(),
+        preferredAccountOrder: [String] = []
+    ) -> [OpenAIAccountGroup] {
+        _ = preferredAccountOrder
+        return Dictionary(grouping: accounts, by: \.email)
             .map { email, groupedAccounts in
                 OpenAIAccountGroup(
                     email: email,
-                    accounts: groupedAccounts.sorted(by: accountPrecedes)
+                    accounts: groupedAccounts.sorted {
+                        self.accountPrecedes(
+                            $0,
+                            $1,
+                            quotaSortSettings: quotaSortSettings
+                        )
+                    }
                 )
             }
-            .sorted(by: groupPrecedes)
+            .sorted {
+                self.groupPrecedes(
+                    $0,
+                    $1,
+                    quotaSortSettings: quotaSortSettings
+                )
+            }
     }
 
     nonisolated static func groupedAccounts(
         from accounts: [TokenAccount],
         attribution: OpenAILiveSessionAttribution,
-        now: Date = Date()
+        now: Date = Date(),
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init(),
+        preferredAccountOrder: [String] = []
     ) -> [OpenAIAccountGroup] {
         self.groupedAccounts(
             from: accounts,
-            prioritizedAccountIDs: Set(attribution.liveSummary(now: now).inUseSessionCounts.keys)
+            prioritizedAccountIDs: Set(attribution.liveSummary(now: now).inUseSessionCounts.keys),
+            quotaSortSettings: quotaSortSettings,
+            preferredAccountOrder: preferredAccountOrder
         )
     }
 
     nonisolated static func groupedAccounts(
         from accounts: [TokenAccount],
-        attribution: OpenAIRunningThreadAttribution
+        attribution: OpenAIRunningThreadAttribution,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init(),
+        preferredAccountOrder: [String] = []
     ) -> [OpenAIAccountGroup] {
         self.groupedAccounts(
             from: accounts,
-            prioritizedAccountIDs: Set(attribution.summary.runningThreadCounts.keys)
+            prioritizedAccountIDs: Set(attribution.summary.runningThreadCounts.keys),
+            quotaSortSettings: quotaSortSettings,
+            preferredAccountOrder: preferredAccountOrder
         )
     }
 
     nonisolated static func groupedAccounts(
         from accounts: [TokenAccount],
-        summary: OpenAIRunningThreadAttribution.Summary
+        summary: OpenAIRunningThreadAttribution.Summary,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init(),
+        preferredAccountOrder: [String] = []
     ) -> [OpenAIAccountGroup] {
         self.groupedAccounts(
             from: accounts,
-            prioritizedAccountIDs: Set(summary.runningThreadCounts.keys)
+            prioritizedAccountIDs: Set(summary.runningThreadCounts.keys),
+            quotaSortSettings: quotaSortSettings,
+            preferredAccountOrder: preferredAccountOrder
         )
     }
 
     nonisolated private static func groupedAccounts(
         from accounts: [TokenAccount],
-        prioritizedAccountIDs: Set<String>
+        prioritizedAccountIDs: Set<String>,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings,
+        preferredAccountOrder: [String]
     ) -> [OpenAIAccountGroup] {
-        Dictionary(grouping: accounts, by: \.email)
+        _ = preferredAccountOrder
+        return Dictionary(grouping: accounts, by: \.email)
             .map { email, groupedAccounts in
                 OpenAIAccountGroup(
                     email: email,
                     accounts: groupedAccounts.sorted {
-                        self.displayAccountPrecedes($0, $1, prioritizedAccountIDs: prioritizedAccountIDs)
+                        self.displayAccountPrecedes(
+                            $0,
+                            $1,
+                            prioritizedAccountIDs: prioritizedAccountIDs,
+                            quotaSortSettings: quotaSortSettings
+                        )
                     }
                 )
             }
-            .sorted { self.displayGroupPrecedes($0, $1, prioritizedAccountIDs: prioritizedAccountIDs) }
+            .sorted {
+                self.displayGroupPrecedes(
+                    $0,
+                    $1,
+                    prioritizedAccountIDs: prioritizedAccountIDs,
+                    quotaSortSettings: quotaSortSettings
+                )
+            }
     }
 
     nonisolated static func visibleGroups(
@@ -108,21 +152,31 @@ enum OpenAIAccountListLayout {
         return visible
     }
 
-    nonisolated static func accountPrecedes(_ lhs: TokenAccount, _ rhs: TokenAccount) -> Bool {
+    nonisolated static func accountPrecedes(
+        _ lhs: TokenAccount,
+        _ rhs: TokenAccount,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init()
+    ) -> Bool {
         if lhs.sortBucket != rhs.sortBucket {
             return lhs.sortBucket.rawValue < rhs.sortBucket.rawValue
         }
 
-        if lhs.weightedPrimaryRemainingPercent != rhs.weightedPrimaryRemainingPercent {
-            return lhs.weightedPrimaryRemainingPercent > rhs.weightedPrimaryRemainingPercent
+        let lhsWeightedPrimary = lhs.weightedPrimaryRemainingPercent(using: quotaSortSettings)
+        let rhsWeightedPrimary = rhs.weightedPrimaryRemainingPercent(using: quotaSortSettings)
+        if lhsWeightedPrimary != rhsWeightedPrimary {
+            return lhsWeightedPrimary > rhsWeightedPrimary
         }
 
-        if lhs.weightedSecondaryRemainingPercent != rhs.weightedSecondaryRemainingPercent {
-            return lhs.weightedSecondaryRemainingPercent > rhs.weightedSecondaryRemainingPercent
+        let lhsWeightedSecondary = lhs.weightedSecondaryRemainingPercent(using: quotaSortSettings)
+        let rhsWeightedSecondary = rhs.weightedSecondaryRemainingPercent(using: quotaSortSettings)
+        if lhsWeightedSecondary != rhsWeightedSecondary {
+            return lhsWeightedSecondary > rhsWeightedSecondary
         }
 
-        if lhs.planQuotaMultiplier != rhs.planQuotaMultiplier {
-            return lhs.planQuotaMultiplier > rhs.planQuotaMultiplier
+        let lhsPlanMultiplier = lhs.planQuotaMultiplier(using: quotaSortSettings)
+        let rhsPlanMultiplier = rhs.planQuotaMultiplier(using: quotaSortSettings)
+        if lhsPlanMultiplier != rhsPlanMultiplier {
+            return lhsPlanMultiplier > rhsPlanMultiplier
         }
 
         if lhs.primaryRemainingPercent != rhs.primaryRemainingPercent {
@@ -145,7 +199,8 @@ enum OpenAIAccountListLayout {
     nonisolated private static func displayAccountPrecedes(
         _ lhs: TokenAccount,
         _ rhs: TokenAccount,
-        prioritizedAccountIDs: Set<String>
+        prioritizedAccountIDs: Set<String>,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings
     ) -> Bool {
         let lhsPriority = self.displayPriority(for: lhs, prioritizedAccountIDs: prioritizedAccountIDs)
         let rhsPriority = self.displayPriority(for: rhs, prioritizedAccountIDs: prioritizedAccountIDs)
@@ -153,7 +208,11 @@ enum OpenAIAccountListLayout {
             return lhsPriority.rawValue < rhsPriority.rawValue
         }
 
-        return self.accountPrecedes(lhs, rhs)
+        return self.accountPrecedes(
+            lhs,
+            rhs,
+            quotaSortSettings: quotaSortSettings
+        )
     }
 
     nonisolated private static func displayPriority(
@@ -166,16 +225,28 @@ enum OpenAIAccountListLayout {
         return .standard
     }
 
-    nonisolated private static func groupPrecedes(_ lhs: OpenAIAccountGroup, _ rhs: OpenAIAccountGroup) -> Bool {
+    nonisolated private static func groupPrecedes(
+        _ lhs: OpenAIAccountGroup,
+        _ rhs: OpenAIAccountGroup,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings
+    ) -> Bool {
         let lhsRepresentative = lhs.accounts.first
         let rhsRepresentative = rhs.accounts.first
 
         switch (lhsRepresentative, rhsRepresentative) {
         case let (lhsAccount?, rhsAccount?):
-            if accountPrecedes(lhsAccount, rhsAccount) {
+            if self.accountPrecedes(
+                lhsAccount,
+                rhsAccount,
+                quotaSortSettings: quotaSortSettings
+            ) {
                 return true
             }
-            if accountPrecedes(rhsAccount, lhsAccount) {
+            if self.accountPrecedes(
+                rhsAccount,
+                lhsAccount,
+                quotaSortSettings: quotaSortSettings
+            ) {
                 return false
             }
         case (.some, nil):
@@ -192,17 +263,28 @@ enum OpenAIAccountListLayout {
     nonisolated private static func displayGroupPrecedes(
         _ lhs: OpenAIAccountGroup,
         _ rhs: OpenAIAccountGroup,
-        prioritizedAccountIDs: Set<String>
+        prioritizedAccountIDs: Set<String>,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings
     ) -> Bool {
         let lhsRepresentative = lhs.accounts.first
         let rhsRepresentative = rhs.accounts.first
 
         switch (lhsRepresentative, rhsRepresentative) {
         case let (lhsAccount?, rhsAccount?):
-            if self.displayAccountPrecedes(lhsAccount, rhsAccount, prioritizedAccountIDs: prioritizedAccountIDs) {
+            if self.displayAccountPrecedes(
+                lhsAccount,
+                rhsAccount,
+                prioritizedAccountIDs: prioritizedAccountIDs,
+                quotaSortSettings: quotaSortSettings
+            ) {
                 return true
             }
-            if self.displayAccountPrecedes(rhsAccount, lhsAccount, prioritizedAccountIDs: prioritizedAccountIDs) {
+            if self.displayAccountPrecedes(
+                rhsAccount,
+                lhsAccount,
+                prioritizedAccountIDs: prioritizedAccountIDs,
+                quotaSortSettings: quotaSortSettings
+            ) {
                 return false
             }
         case (.some, nil):

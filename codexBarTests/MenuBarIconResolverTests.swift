@@ -35,4 +35,30 @@ final class MenuBarIconResolverTests: XCTestCase {
 
         XCTAssertEqual(icon, "exclamationmark.triangle.fill")
     }
+
+    func testPopupAlertThresholdControlsBoltWarningIcon() {
+        let accounts = [
+            TokenAccount(
+                email: "alice@example.com",
+                accountId: "acct_alice",
+                primaryUsedPercent: 85,
+                secondaryUsedPercent: 10,
+                isActive: true
+            )
+        ]
+
+        let relaxed = MenuBarIconResolver.iconName(
+            accounts: accounts,
+            activeProviderKind: .openAIOAuth,
+            popupAlertThresholdPercent: 10
+        )
+        let strict = MenuBarIconResolver.iconName(
+            accounts: accounts,
+            activeProviderKind: .openAIOAuth,
+            popupAlertThresholdPercent: 20
+        )
+
+        XCTAssertEqual(relaxed, "terminal.fill")
+        XCTAssertEqual(strict, "bolt.circle.fill")
+    }
 }

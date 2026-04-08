@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 final class AutoRoutingCoordinatorTests: CodexBarTestCase {
-    func testConfigDecodesMissingAutoRoutingWithDefaults() throws {
+    func testConfigDecodesMissingDesktopAndPromptModeWithDefaults() throws {
         let json = """
         {
           "version": 1,
@@ -22,6 +22,73 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
         XCTAssertFalse(config.autoRouting.enabled)
         XCTAssertEqual(config.autoRouting.urgentThresholdPercent, 5)
         XCTAssertEqual(config.autoRouting.switchThresholdPercent, 10)
+        XCTAssertNil(config.desktop.preferredCodexAppPath)
+        XCTAssertEqual(config.autoRouting.promptMode, .launchNewInstance)
+        XCTAssertEqual(config.openAI.popupAlertThresholdPercent, 20)
+        XCTAssertEqual(config.openAI.usageDisplayMode, .used)
+        XCTAssertEqual(config.openAI.quotaSort.plusRelativeWeight, 10)
+        XCTAssertEqual(config.openAI.quotaSort.teamRelativeToPlusMultiplier, 1.5)
+        XCTAssertEqual(config.openAI.accountOrder, [])
+    }
+
+    func testConfigDecodesLegacyNestedSectionsWithoutNewFields() throws {
+        let json = """
+        {
+          "version": 1,
+          "global": {
+            "defaultModel": "gpt-5.4",
+            "reviewModel": "gpt-5.4",
+            "reasoningEffort": "xhigh"
+          },
+          "active": {},
+          "autoRouting": {
+            "enabled": true,
+            "switchThresholdPercent": 15
+          },
+          "openAI": {
+            "accountOrder": ["acct_a"],
+            "popupAlertThresholdPercent": 25
+          },
+          "desktop": {},
+          "providers": []
+        }
+        """
+        let data = try XCTUnwrap(json.data(using: .utf8))
+
+        let config = try JSONDecoder().decode(CodexBarConfig.self, from: data)
+
+        XCTAssertTrue(config.autoRouting.enabled)
+        XCTAssertEqual(config.autoRouting.switchThresholdPercent, 15)
+        XCTAssertEqual(config.autoRouting.promptMode, .launchNewInstance)
+        XCTAssertEqual(config.openAI.accountOrder, ["acct_a"])
+        XCTAssertEqual(config.openAI.popupAlertThresholdPercent, 25)
+        XCTAssertEqual(config.openAI.usageDisplayMode, .used)
+        XCTAssertEqual(config.openAI.quotaSort.plusRelativeWeight, 10)
+        XCTAssertEqual(config.openAI.quotaSort.teamRelativeToPlusMultiplier, 1.5)
+        XCTAssertNil(config.desktop.preferredCodexAppPath)
+    }
+
+    @MainActor
+    func testSaveDesktopAndOpenAISettingsRejectsInvalidCodexAppPath() throws {
+        let invalidURL = try self.makeDirectory(named: "Invalid/Codex.app")
+        TokenStore.shared.load()
+
+        XCTAssertThrowsError(
+            try TokenStore.shared.saveDesktopAndOpenAISettings(
+                accountOrder: [],
+                popupAlertThresholdPercent: 20,
+                usageDisplayMode: .used,
+                plusRelativeWeight: 10,
+                teamRelativeToPlusMultiplier: 1.5,
+                preferredCodexAppPath: invalidURL.path,
+                autoRoutingPromptMode: .launchNewInstance
+            )
+        ) { error in
+            XCTAssertEqual(
+                error.localizedDescription,
+                TokenStoreError.invalidCodexAppPath.localizedDescription
+            )
+        }
     }
 
     func testBestCandidatePrefersUsableAccountWithMostPrimaryQuota() {
@@ -126,6 +193,169 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
 
         XCTAssertEqual(decision?.account.accountId, "acct_better")
         XCTAssertEqual(decision?.reason, .autoThreshold)
+    }
+
+    func testDecisionUsesPopupAlertThresholdForRecommendation() {
+        let settings = CodexBarAutoRoutingSettings(enabled: true)
+        let current = self.makeAccount(accountId: "acct_current", primaryUsedPercent: 70, secondaryUsedPercent: 10)
+        let better = self.makeAccount(accountId: "acct_better", primaryUsedPercent: 10, secondaryUsedPercent: 10)
+
+        let relaxed = AutoRoutingPolicy.decision(
+            from: [current, better],
+            currentAccountID: "acct_current",
+            settings: settings,
+            fallbackReason: .startupBestAccount,
+            popupAlertThresholdPercent: 20
+        )
+        let strict = AutoRoutingPolicy.decision(
+            from: [current, better],
+            currentAccountID: "acct_current",
+            settings: settings,
+            fallbackReason: .startupBestAccount,
+            popupAlertThresholdPercent: 30
+        )
+
+        XCTAssertNil(relaxed)
+        XCTAssertEqual(strict?.account.accountId, "acct_better")
+        XCTAssertEqual(strict?.reason, .autoThreshold)
+    }
+
+    func testThresholdPlanUsesLaunchNewInstanceMode() {
+        let decision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoThreshold
+        )
+
+        let plan = AutoRoutingDecisionPlanner.plan(
+            decision: decision,
+            promptMode: .launchNewInstance,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: nil
+        )
+
+        guard case let .thresholdPrompt(mode, promptKey, plannedDecision) = plan else {
+            return XCTFail("Expected threshold prompt plan")
+        }
+        XCTAssertEqual(plannedDecision.account.accountId, decision.account.accountId)
+        XCTAssertEqual(plannedDecision.reason, decision.reason)
+        XCTAssertEqual(promptKey, "acct_current->acct_target:auto-threshold")
+        XCTAssertEqual(mode, .launchNewInstance)
+    }
+
+    func testThresholdPlanUsesRemindOnlyMode() {
+        let decision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoThreshold
+        )
+
+        let plan = AutoRoutingDecisionPlanner.plan(
+            decision: decision,
+            promptMode: .remindOnly,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: nil
+        )
+
+        guard case let .thresholdPrompt(mode, promptKey, plannedDecision) = plan else {
+            return XCTFail("Expected threshold prompt plan")
+        }
+        XCTAssertEqual(plannedDecision.account.accountId, decision.account.accountId)
+        XCTAssertEqual(plannedDecision.reason, decision.reason)
+        XCTAssertEqual(promptKey, "acct_current->acct_target:auto-threshold")
+        XCTAssertEqual(mode, .remindOnly)
+    }
+
+    func testThresholdPlanIsDisabledOnlyForAutoThreshold() {
+        let decision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoThreshold
+        )
+
+        let plan = AutoRoutingDecisionPlanner.plan(
+            decision: decision,
+            promptMode: .disabled,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: nil
+        )
+
+        guard case let .none(clearSuppressedPrompt) = plan else {
+            return XCTFail("Expected no prompt plan")
+        }
+        XCTAssertFalse(clearSuppressedPrompt)
+    }
+
+    func testForcedFailoverIgnoresDisabledPromptMode() {
+        let decision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoExhausted
+        )
+
+        let plan = AutoRoutingDecisionPlanner.plan(
+            decision: decision,
+            promptMode: .disabled,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: "acct_current->acct_target:auto-exhausted"
+        )
+
+        guard case let .forcedFailover(plannedDecision) = plan else {
+            return XCTFail("Expected forced failover plan")
+        }
+        XCTAssertEqual(plannedDecision.account.accountId, decision.account.accountId)
+        XCTAssertEqual(plannedDecision.reason, decision.reason)
+    }
+
+    func testRemindOnlySuppressionKeySuppressesSameDecisionButAllowsChangedDecision() {
+        let decision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target_a", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoThreshold
+        )
+        let suppressedKey = AutoRoutingDecisionPlanner.promptKey(
+            currentAccountID: "acct_current",
+            decision: decision
+        )
+
+        let suppressedPlan = AutoRoutingDecisionPlanner.plan(
+            decision: decision,
+            promptMode: .remindOnly,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: suppressedKey
+        )
+        guard case .suppressed = suppressedPlan else {
+            return XCTFail("Expected suppressed plan")
+        }
+
+        let changedTargetDecision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target_b", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoThreshold
+        )
+        let changedTargetPlan = AutoRoutingDecisionPlanner.plan(
+            decision: changedTargetDecision,
+            promptMode: .remindOnly,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: suppressedKey
+        )
+        guard case let .thresholdPrompt(mode, promptKey, plannedDecision) = changedTargetPlan else {
+            return XCTFail("Expected prompt for changed target")
+        }
+        XCTAssertEqual(plannedDecision.account.accountId, changedTargetDecision.account.accountId)
+        XCTAssertEqual(plannedDecision.reason, changedTargetDecision.reason)
+        XCTAssertEqual(promptKey, "acct_current->acct_target_b:auto-threshold")
+        XCTAssertEqual(mode, .remindOnly)
+
+        let changedReasonDecision = AutoRoutingPolicy.Decision(
+            account: self.makeAccount(accountId: "acct_target_a", primaryUsedPercent: 10, secondaryUsedPercent: 5),
+            reason: .autoUnavailable
+        )
+        let changedReasonPlan = AutoRoutingDecisionPlanner.plan(
+            decision: changedReasonDecision,
+            promptMode: .remindOnly,
+            currentAccountID: "acct_current",
+            suppressedPromptKey: suppressedKey
+        )
+        guard case let .forcedFailover(plannedDecision) = changedReasonPlan else {
+            return XCTFail("Expected forced failover plan for changed reason")
+        }
+        XCTAssertEqual(plannedDecision.account.accountId, changedReasonDecision.account.accountId)
+        XCTAssertEqual(plannedDecision.reason, changedReasonDecision.reason)
     }
 
     func testDecisionPromotesMixedPlanCandidateWhenCurrentIsDegraded() {
@@ -396,6 +626,12 @@ final class AutoRoutingCoordinatorTests: CodexBarTestCase {
         }
         let content = try String(contentsOf: CodexPaths.switchJournalURL, encoding: .utf8)
         return content.split(separator: "\n").map(String.init)
+    }
+
+    private func makeDirectory(named relativePath: String) throws -> URL {
+        let url = CodexPaths.realHome.appendingPathComponent(relativePath, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 
     private func makeAccount(

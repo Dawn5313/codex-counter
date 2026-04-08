@@ -99,4 +99,44 @@ final class OpenAIOAuthFlowServiceTests: CodexBarTestCase {
         XCTAssertEqual(result.account.email, "mismatch@example.com")
         XCTAssertFalse(result.active)
     }
+
+    func testCompleteFlowUsesUserScopedAccountIDWhenPresent() async throws {
+        let accessToken = try self.makeJWT(payload: [
+            "https://api.openai.com/auth": [
+                "chatgpt_account_id": "acct_team_shared",
+                "chatgpt_account_user_id": "user-second__acct_team_shared",
+                "chatgpt_user_id": "user-second",
+                "user_id": "user-second",
+                "chatgpt_plan_type": "team",
+            ],
+        ])
+        let idToken = try self.makeJWT(payload: [
+            "email": "second-team@example.com",
+        ])
+
+        MockURLProtocol.handler = { request in
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            let data = try JSONSerialization.data(withJSONObject: [
+                "access_token": accessToken,
+                "refresh_token": "refresh-token",
+                "id_token": idToken,
+            ], options: [.sortedKeys])
+            return (response, data)
+        }
+
+        let service = OpenAIOAuthFlowService(session: self.makeMockSession())
+        let started = try service.startFlow()
+
+        let result = try await service.completeFlow(
+            flowID: started.flowID,
+            code: "oauth-code",
+            returnedState: "different-state",
+            activate: false
+        )
+
+        XCTAssertEqual(result.account.accountId, "user-second__acct_team_shared")
+        XCTAssertEqual(result.account.remoteAccountId, "acct_team_shared")
+        XCTAssertEqual(result.account.email, "second-team@example.com")
+        XCTAssertFalse(result.active)
+    }
 }

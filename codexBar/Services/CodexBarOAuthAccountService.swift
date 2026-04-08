@@ -110,7 +110,7 @@ struct CodexBarOAuthAccountService {
         let previousProviderID = config.active.providerId
         let previousAccountID = config.active.accountId
         let previousProviderKind = config.activeProvider()?.kind
-        let existingAccountIDs = Set(config.oauthProvider()?.accounts.compactMap(\.openAIAccountId) ?? [])
+        let existingAccountIDs = Set(config.oauthProvider()?.accounts.map(\.id) ?? [])
         let addedCount = accounts.reduce(into: 0) { partialResult, account in
             if existingAccountIDs.contains(account.accountId) == false {
                 partialResult += 1

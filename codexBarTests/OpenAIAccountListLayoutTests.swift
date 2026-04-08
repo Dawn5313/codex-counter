@@ -166,6 +166,37 @@ final class OpenAIAccountListLayoutTests: XCTestCase {
         XCTAssertEqual(grouped.map(\.email), ["team@example.com", "plus@example.com"])
     }
 
+    func testCustomQuotaSortSettingsAdjustRelativeWeights() {
+        let free = makeAccount(
+            email: "free@example.com",
+            accountId: "acct_free",
+            planType: "free",
+            primaryUsedPercent: 0,
+            secondaryUsedPercent: 0
+        )
+        let plus = makeAccount(
+            email: "plus@example.com",
+            accountId: "acct_plus",
+            planType: "plus",
+            primaryUsedPercent: 80,
+            secondaryUsedPercent: 80
+        )
+        let quotaSort = CodexBarOpenAISettings.QuotaSortSettings(
+            plusRelativeWeight: 4,
+            teamRelativeToPlusMultiplier: 2
+        )
+
+        XCTAssertEqual(plus.planQuotaMultiplier(using: quotaSort), 4)
+        XCTAssertEqual(plus.weightedPrimaryRemainingPercent(using: quotaSort), 80)
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(
+            from: [free, plus],
+            quotaSortSettings: quotaSort
+        )
+
+        XCTAssertEqual(grouped.map(\.email), ["free@example.com", "plus@example.com"])
+    }
+
     func testUnknownPlanTypeFallsBackToFreeWeight() {
         let unknown = makeAccount(
             email: "unknown@example.com",
@@ -361,6 +392,50 @@ final class OpenAIAccountListLayoutTests: XCTestCase {
             "acct_beta_1",
             "acct_beta_2",
         ])
+    }
+
+    func testPreferredAccountOrderDoesNotOverrideQuotaSortingAcrossGroups() {
+        let healthy = makeAccount(
+            email: "healthy@example.com",
+            accountId: "acct_healthy",
+            primaryUsedPercent: 5,
+            secondaryUsedPercent: 5
+        )
+        let manualTop = makeAccount(
+            email: "manual@example.com",
+            accountId: "acct_manual",
+            primaryUsedPercent: 70,
+            secondaryUsedPercent: 20
+        )
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(
+            from: [healthy, manualTop],
+            preferredAccountOrder: ["acct_manual", "acct_healthy"]
+        )
+
+        XCTAssertEqual(grouped.map(\.email), ["healthy@example.com", "manual@example.com"])
+    }
+
+    func testPreferredAccountOrderDoesNotOverrideQuotaSortingForUnlistedAccounts() {
+        let listed = makeAccount(
+            email: "listed@example.com",
+            accountId: "acct_listed",
+            primaryUsedPercent: 60,
+            secondaryUsedPercent: 10
+        )
+        let unlistedBetter = makeAccount(
+            email: "better@example.com",
+            accountId: "acct_better",
+            primaryUsedPercent: 5,
+            secondaryUsedPercent: 5
+        )
+
+        let grouped = OpenAIAccountListLayout.groupedAccounts(
+            from: [unlistedBetter, listed],
+            preferredAccountOrder: ["acct_listed"]
+        )
+
+        XCTAssertEqual(grouped.map(\.email), ["better@example.com", "listed@example.com"])
     }
 
     private func makeAccount(

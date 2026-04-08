@@ -6,6 +6,7 @@ struct TokenAccount: Codable, Identifiable {
     var id: String { accountId }
     var email: String
     var accountId: String
+    var openAIAccountId: String
     var accessToken: String
     var refreshToken: String
     var idToken: String
@@ -26,6 +27,7 @@ struct TokenAccount: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case email
         case accountId = "account_id"
+        case openAIAccountId = "openai_account_id"
         case organizationName = "organization_name"
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
@@ -48,6 +50,7 @@ struct TokenAccount: Codable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         email = try c.decode(String.self, forKey: .email)
         accountId = try c.decode(String.self, forKey: .accountId)
+        openAIAccountId = try c.decodeIfPresent(String.self, forKey: .openAIAccountId) ?? accountId
         accessToken = try c.decode(String.self, forKey: .accessToken)
         refreshToken = try c.decode(String.self, forKey: .refreshToken)
         idToken = try c.decode(String.self, forKey: .idToken)
@@ -66,7 +69,7 @@ struct TokenAccount: Codable, Identifiable {
         organizationName = try c.decodeIfPresent(String.self, forKey: .organizationName)
     }
 
-    init(email: String = "", accountId: String = "", accessToken: String = "",
+    init(email: String = "", accountId: String = "", openAIAccountId: String? = nil, accessToken: String = "",
          refreshToken: String = "", idToken: String = "", expiresAt: Date? = nil,
          planType: String = "free", primaryUsedPercent: Double = 0,
          secondaryUsedPercent: Double = 0,
@@ -76,6 +79,7 @@ struct TokenAccount: Codable, Identifiable {
          organizationName: String? = nil) {
         self.email = email
         self.accountId = accountId
+        self.openAIAccountId = openAIAccountId ?? accountId
         self.accessToken = accessToken
         self.refreshToken = refreshToken
         self.idToken = idToken
@@ -95,6 +99,10 @@ struct TokenAccount: Codable, Identifiable {
     }
 
     // MARK: - Computed
+
+    nonisolated var remoteAccountId: String {
+        self.openAIAccountId.isEmpty ? self.accountId : self.openAIAccountId
+    }
 
     nonisolated var isBanned: Bool { isSuspended }
     nonisolated var primaryExhausted: Bool { primaryUsedPercent >= Self.exhaustedRoutingThresholdPercent }
@@ -155,7 +163,12 @@ struct TokenAccount: Codable, Identifiable {
 struct UsageWindowDisplay: Identifiable, Equatable {
     let label: String
     let usedPercent: Double
+    let displayPercent: Double
     let limitWindowSeconds: Int?
+
+    var remainingPercent: Double {
+        max(0, 100 - self.usedPercent)
+    }
 
     var id: String { "\(label)-\(limitWindowSeconds ?? -1)" }
 }
@@ -183,15 +196,21 @@ enum UsageStatus: Equatable {
 }
 
 extension TokenAccount {
-    nonisolated var planQuotaMultiplier: Double {
+    nonisolated func planQuotaMultiplier(
+        using quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings
+    ) -> Double {
         switch self.planType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "plus":
-            return 10.0
+            return quotaSortSettings.plusRelativeWeight
         case "team":
-            return 15.0
+            return quotaSortSettings.teamAbsoluteWeight
         default:
             return 1.0
         }
+    }
+
+    nonisolated var planQuotaMultiplier: Double {
+        self.planQuotaMultiplier(using: CodexBarOpenAISettings.QuotaSortSettings())
     }
 
     nonisolated var primaryRemainingPercent: Double {
@@ -202,12 +221,24 @@ extension TokenAccount {
         max(0, 100 - secondaryUsedPercent)
     }
 
+    nonisolated func weightedPrimaryRemainingPercent(
+        using quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings
+    ) -> Double {
+        self.primaryRemainingPercent * self.planQuotaMultiplier(using: quotaSortSettings)
+    }
+
     nonisolated var weightedPrimaryRemainingPercent: Double {
-        self.primaryRemainingPercent * self.planQuotaMultiplier
+        self.weightedPrimaryRemainingPercent(using: CodexBarOpenAISettings.QuotaSortSettings())
+    }
+
+    nonisolated func weightedSecondaryRemainingPercent(
+        using quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings
+    ) -> Double {
+        self.secondaryRemainingPercent * self.planQuotaMultiplier(using: quotaSortSettings)
     }
 
     nonisolated var weightedSecondaryRemainingPercent: Double {
-        self.secondaryRemainingPercent * self.planQuotaMultiplier
+        self.weightedSecondaryRemainingPercent(using: CodexBarOpenAISettings.QuotaSortSettings())
     }
 
     nonisolated var sortBucket: OpenAIAccountSortBucket {
@@ -247,12 +278,25 @@ extension TokenAccount {
     }
 
     nonisolated var usageWindowDisplays: [UsageWindowDisplay] {
+        self.usageWindowDisplays(mode: .used)
+    }
+
+    nonisolated func usageWindowDisplays(mode: CodexBarUsageDisplayMode) -> [UsageWindowDisplay] {
         self.rateLimitWindows(now: Date()).map {
             UsageWindowDisplay(
                 label: self.windowLabel(for: $0.limitWindowSeconds),
                 usedPercent: $0.usedPercent,
+                displayPercent: mode == .remaining ? max(0, 100 - $0.usedPercent) : $0.usedPercent,
                 limitWindowSeconds: $0.limitWindowSeconds
             )
+        }
+    }
+
+    nonisolated func isBelowPopupAlertThreshold(_ thresholdPercent: Double) -> Bool {
+        guard thresholdPercent > 0 else { return false }
+        guard self.isBanned == false, self.tokenExpired == false else { return false }
+        return self.rateLimitWindows(now: Date()).contains {
+            max(0, 100 - $0.usedPercent) <= thresholdPercent
         }
     }
 

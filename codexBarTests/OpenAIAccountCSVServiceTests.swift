@@ -34,6 +34,58 @@ final class OpenAIAccountCSVServiceTests: CodexBarTestCase {
         }
     }
 
+    func testParseCSVAcceptsLegacyRemoteAccountIDValue() throws {
+        let service = OpenAIAccountCSVService()
+        let account = try self.makeOAuthAccount(
+            accountID: "acct_team_shared",
+            email: "user@example.com",
+            isActive: true,
+            planType: "team",
+            localAccountID: "user-legacy__acct_team_shared"
+        )
+        let exported = service.makeCSV(from: [account])
+        var lines = exported.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+        var fields = lines[1].split(separator: ",", omittingEmptySubsequences: false).map(String.init)
+        fields[2] = "acct_team_shared"
+        lines[1] = fields.joined(separator: ",")
+
+        let parsed = try service.parseCSV(lines.joined(separator: "\n"))
+
+        XCTAssertEqual(parsed.rowCount, 1)
+        XCTAssertEqual(parsed.activeAccountID, "user-legacy__acct_team_shared")
+        XCTAssertEqual(parsed.accounts.first?.accountId, "user-legacy__acct_team_shared")
+        XCTAssertEqual(parsed.accounts.first?.remoteAccountId, "acct_team_shared")
+    }
+
+    func testMakeCSVRoundTripsDistinctTeamUsersWithSharedRemoteAccountID() throws {
+        let service = OpenAIAccountCSVService()
+        let first = try self.makeOAuthAccount(
+            accountID: "acct_team_shared",
+            email: "first-team@example.com",
+            isActive: true,
+            planType: "team",
+            localAccountID: "user-first__acct_team_shared"
+        )
+        let second = try self.makeOAuthAccount(
+            accountID: "acct_team_shared",
+            email: "second-team@example.com",
+            isActive: false,
+            planType: "team",
+            localAccountID: "user-second__acct_team_shared"
+        )
+
+        let csv = service.makeCSV(from: [first, second])
+        let parsed = try service.parseCSV(csv)
+
+        XCTAssertEqual(parsed.rowCount, 2)
+        XCTAssertEqual(Set(parsed.accounts.map(\.accountId)), [
+            "user-first__acct_team_shared",
+            "user-second__acct_team_shared",
+        ])
+        XCTAssertEqual(Set(parsed.accounts.map(\.remoteAccountId)), ["acct_team_shared"])
+        XCTAssertEqual(parsed.activeAccountID, "user-first__acct_team_shared")
+    }
+
     func testParseCSVRejectsDuplicateAccountIDs() throws {
         let service = OpenAIAccountCSVService()
         let first = try self.makeOAuthAccount(accountID: "acct_same", email: "first@example.com", refreshToken: "refresh-1")

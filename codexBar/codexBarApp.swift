@@ -36,7 +36,7 @@ struct MenuBarIconView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundColor(.orange)
                 } else {
-                    Text("\(Int(active.primaryUsedPercent))%·\(Int(active.secondaryUsedPercent))%")
+                    Text(self.usageSummaryText(for: active))
                         .font(.system(size: 10, weight: .medium))
                 }
             } else if let provider = store.activeProvider {
@@ -50,7 +50,8 @@ struct MenuBarIconView: View {
     private var iconName: String {
         MenuBarIconResolver.iconName(
             accounts: store.accounts,
-            activeProviderKind: store.activeProvider?.kind
+            activeProviderKind: store.activeProvider?.kind,
+            popupAlertThresholdPercent: store.config.openAI.popupAlertThresholdPercent
         )
     }
 
@@ -58,5 +59,11 @@ struct MenuBarIconView: View {
         let label = provider.label.trimmingCharacters(in: .whitespacesAndNewlines)
         if label.count <= 6 { return label }
         return String(label.prefix(6))
+    }
+
+    private func usageSummaryText(for account: TokenAccount) -> String {
+        account.usageWindowDisplays(mode: self.store.config.openAI.usageDisplayMode)
+            .map { "\(Int($0.displayPercent))%" }
+            .joined(separator: "·")
     }
 }

@@ -51,6 +51,92 @@ enum L {
     }
     static var exportOpenAICSVAction: String { zh ? "导出 OpenAI CSV…" : "Export OpenAI CSV…" }
     static var importOpenAICSVAction: String { zh ? "导入 OpenAI CSV…" : "Import OpenAI CSV…" }
+    static var settings: String { zh ? "设置" : "Settings" }
+    static var settingsWindowTitle: String { self.settings }
+    static var settingsWindowHint: String {
+        zh
+            ? "调整 OpenAI 的显示、用量排序参数和阈值提醒；底部是自动切换推荐弹窗与 Codex.app 路径。"
+            : "Adjust OpenAI display, quota-sorting parameters, and threshold alerts. Auto-switch prompts and the Codex.app path are at the bottom."
+    }
+    static var usageDisplayModeTitle: String { zh ? "用量显示方式" : "Usage Display" }
+    static var remainingUsageDisplay: String { zh ? "剩余用量" : "Remaining Quota" }
+    static var usedQuotaDisplay: String { zh ? "已用额度" : "Used Quota" }
+    static var remainingShort: String { zh ? "剩余" : "Remaining" }
+    static var usedShort: String { zh ? "已用" : "Used" }
+    static var quotaSortSettingsTitle: String { zh ? "用量排序参数" : "Quota Sort Parameters" }
+    static var quotaSortSettingsHint: String {
+        zh
+            ? "排序仍按用量规则计算，正在使用和运行中的账号优先。这里仅调整套餐权重换算：默认 free=1、plus=10、team=plus×1.5。"
+            : "Sorting still follows quota usage rules, with active and running accounts first. These controls only adjust plan weighting: by default free=1, plus=10, and team=plus×1.5."
+    }
+    static var quotaSortPlusWeightTitle: String { zh ? "Plus 相对 Free 权重" : "Plus Weight vs Free" }
+    static var quotaSortTeamRatioTitle: String { zh ? "Team 相对 Plus 倍数" : "Team Ratio vs Plus" }
+    static func quotaSortPlusWeightValue(_ value: Double) -> String {
+        let formatted = String(format: "%.1f", value)
+        return zh ? "plus=\(formatted)" : "plus=\(formatted)"
+    }
+    static func quotaSortTeamRatioValue(_ value: Double, absoluteTeamWeight: Double) -> String {
+        let ratio = String(format: "%.1f", value)
+        let teamWeight = String(format: "%.1f", absoluteTeamWeight)
+        return zh ? "team=plus×\(ratio) (= \(teamWeight))" : "team=plus×\(ratio) (= \(teamWeight))"
+    }
+    static var popupAlertThresholdTitle: String { zh ? "弹窗用量告警阈值" : "Popup Usage Alert Threshold" }
+    static var popupAlertThresholdHint: String {
+        zh
+            ? "当任一窗口的剩余用量低于该值时，在账号列表和菜单栏图标中高亮提示；启用自动切换时，也会用于推荐切换弹窗。设为 0% 可关闭。"
+            : "Highlight the account list and menu bar icon when any window's remaining quota drops below this value. When auto-switch is enabled, the same threshold also drives the recommended switch popup. Set to 0% to disable."
+    }
+    static func popupAlertThresholdValue(_ value: Int) -> String {
+        zh ? "剩余 ≤ \(value)%" : "Remaining <= \(value)%"
+    }
+    static var popupAlertDisabled: String { zh ? "已关闭" : "Off" }
+    static var accountOrderTitle: String { zh ? "OpenAI 账号顺序" : "OpenAI Account Order" }
+    static var accountOrderHint: String {
+        zh ? "保存后会优先按手动顺序显示；主弹窗里仍会按邮箱分组展示，这里控制组间顺序和组内账号顺序。" : "Saved manual order takes priority. The main popup still groups accounts by email, so this controls group order and account order within each group."
+    }
+    static var noOpenAIAccountsForOrdering: String { zh ? "当前没有可排序的 OpenAI 账号。" : "There are no OpenAI accounts to reorder." }
+    static var moveUp: String { zh ? "上移" : "Move Up" }
+    static var moveDown: String { zh ? "下移" : "Move Down" }
+    static var save: String { zh ? "保存" : "Save" }
+    static var codexAppPathTitle: String { zh ? "Codex.app 路径" : "Codex.app Path" }
+    static var codexAppPathHint: String {
+        zh
+            ? "手动路径优先；路径失效时会自动回退系统探测。有效路径必须是绝对路径、指向 Codex.app，并包含 Contents/Resources/codex。"
+            : "A manual path takes priority, but invalid paths fall back to automatic detection. Valid paths must be absolute, point to Codex.app, and include Contents/Resources/codex."
+    }
+    static var codexAppPathChooseAction: String { zh ? "选择…" : "Choose…" }
+    static var codexAppPathResetAction: String { zh ? "恢复自动探测" : "Use Auto Detection" }
+    static var codexAppPathPanelTitle: String { zh ? "选择 Codex.app" : "Choose Codex.app" }
+    static var codexAppPathPanelMessage: String {
+        zh ? "请选择一个有效的 Codex.app。" : "Choose a valid Codex.app."
+    }
+    static var codexAppPathEmptyValue: String { zh ? "当前未设置手动路径" : "No manual path selected" }
+    static var codexAppPathUsingManualStatus: String { zh ? "使用手动路径" : "Using the manual path" }
+    static var codexAppPathInvalidFallbackStatus: String { zh ? "手动路径无效，已回退自动探测" : "Manual path is invalid; falling back to automatic detection" }
+    static var codexAppPathAutomaticStatus: String { zh ? "当前使用自动探测" : "Currently using automatic detection" }
+    static var codexAppPathInvalidSelection: String {
+        zh
+            ? "所选路径不是有效的 Codex.app。请确认它是绝对路径、名为 Codex.app，并包含 Contents/Resources/codex。"
+            : "The selected path is not a valid Codex.app. Make sure it is an absolute path named Codex.app and includes Contents/Resources/codex."
+    }
+    static var autoRoutingPromptModeTitle: String { zh ? "自动切换推荐弹窗" : "Auto-Switch Recommendation Prompt" }
+    static var autoRoutingPromptModeHint: String {
+        zh
+            ? "仅影响 autoThreshold 推荐；autoUnavailable / autoExhausted 仍会走独立 forced failover 保护。"
+            : "This only affects autoThreshold recommendations. autoUnavailable and autoExhausted still use forced failover protection."
+    }
+    static var autoRoutingPromptModeLaunchNewInstance: String { zh ? "切换并新开实例" : "Switch and Launch New Instance" }
+    static var autoRoutingPromptModeLaunchNewInstanceHint: String {
+        zh ? "确认后切账号、新开 Codex.app，并关闭旧实例。" : "After confirmation, switch accounts, launch a new Codex.app instance, and close the old one."
+    }
+    static var autoRoutingPromptModeRemindOnly: String { zh ? "只弹窗提醒" : "Remind Only" }
+    static var autoRoutingPromptModeRemindOnlyHint: String {
+        zh ? "只提示推荐账号，不切账号、不新开实例，也不关闭旧实例。" : "Only show the recommendation. Do not switch accounts, launch a new instance, or close the old one."
+    }
+    static var autoRoutingPromptModeDisabled: String { zh ? "关闭推荐弹窗" : "Disable Recommendation Prompt" }
+    static var autoRoutingPromptModeDisabledHint: String {
+        zh ? "彻底关闭阈值型推荐弹窗，但不影响 forced failover。" : "Turn off threshold-based recommendation prompts without affecting forced failover."
+    }
     static var openAICSVExportPrompt: String { zh ? "导出" : "Export" }
     static var openAICSVImportPrompt: String { zh ? "导入" : "Import" }
     static var openAICSVRiskTitle: String { zh ? "导出将包含敏感 OAuth token" : "Export Includes Sensitive OAuth Tokens" }
@@ -161,7 +247,16 @@ enum L {
             ? "当前账号「\(from)」额度已接近阈值。\n\n推荐切换到「\(to)」，并新开一个 Codex 实例。\n\n如果你点“确定”，Codexbar 会切到推荐账号，启动一个新实例，然后关闭当前运行中的 Codex 实例。"
             : "The current account \"\(from)\" is close to its quota threshold.\n\nCodexbar recommends switching to \"\(to)\" and launching a new Codex instance.\n\nIf you choose Confirm, Codexbar will switch to the recommended account, launch a new instance, and close the currently running Codex instance."
     }
+    static var autoSwitchReminderTitle: String {
+        zh ? "推荐切换账号" : "Recommended Account Switch"
+    }
+    static func autoSwitchReminderBody(_ from: String, _ to: String) -> String {
+        zh
+            ? "当前账号「\(from)」额度已接近阈值。\n\n建议下一次切换到「\(to)」。\n\n当前模式仅提醒，不会自动切账号、不会新开实例，也不会关闭旧实例。若要切换，请在账号列表中手动点击“使用”。"
+            : "The current account \"\(from)\" is close to its quota threshold.\n\nCodexbar recommends switching to \"\(to)\" next.\n\nThis mode is reminder-only: it will not switch accounts, launch a new instance, or close the current one. Use the account list's Use button if you want to switch manually."
+    }
     static var confirm: String { zh ? "确定" : "Confirm" }
+    static var acknowledge: String { zh ? "知道了" : "OK" }
     static func autoSwitchBody(_ from: String, _ to: String) -> String {
         zh
             ? "「\(from)」额度不足，已自动切换至「\(to)」"

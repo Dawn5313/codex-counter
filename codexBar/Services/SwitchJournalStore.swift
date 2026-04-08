@@ -80,6 +80,55 @@ struct SwitchJournalStore {
             .sorted { $0.timestamp < $1.timestamp }
     }
 
+    func remapOpenAIOAuthAccountIDs(
+        using accountIDMapping: [String: String],
+        providerID: String = "openai-oauth"
+    ) throws {
+        guard accountIDMapping.isEmpty == false else { return }
+
+        let fileURL = self.resolvedFileURL
+        guard self.fileManager.fileExists(atPath: fileURL.path),
+              let content = try? String(contentsOf: fileURL, encoding: .utf8) else {
+            return
+        }
+
+        var didChange = false
+        let updatedLines = content
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map(String.init)
+            .map { line -> String in
+                guard let data = line.data(using: .utf8),
+                      var object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+                      (object["type"] as? String) == "activation",
+                      (object["providerId"] as? String) == providerID else {
+                    return line
+                }
+
+                var lineChanged = false
+                if let accountID = object["accountId"] as? String,
+                   let remappedID = accountIDMapping[accountID] {
+                    object["accountId"] = remappedID
+                    lineChanged = true
+                }
+                if let previousAccountID = object["previousAccountId"] as? String,
+                   let remappedID = accountIDMapping[previousAccountID] {
+                    object["previousAccountId"] = remappedID
+                    lineChanged = true
+                }
+                guard lineChanged,
+                      let updatedData = try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]),
+                      let updatedLine = String(data: updatedData, encoding: .utf8) else {
+                    return line
+                }
+                didChange = true
+                return updatedLine
+            }
+
+        guard didChange else { return }
+        let rendered = updatedLines.joined(separator: "\n")
+        try CodexPaths.writeSecureFile(Data(rendered.utf8), to: fileURL)
+    }
+
     private func parseActivationRecord(from line: String) -> ActivationRecord? {
         guard let data = line.data(using: .utf8),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

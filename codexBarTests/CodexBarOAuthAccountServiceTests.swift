@@ -137,6 +137,38 @@ final class CodexBarOAuthAccountServiceTests: CodexBarTestCase {
         XCTAssertEqual(accounts.first(where: { $0.accountID == "acct_first" })?.active, false)
     }
 
+    func testImportAccountKeepsDistinctTeamUsersThatShareRemoteAccountID() throws {
+        let service = CodexBarOAuthAccountService()
+        let remoteAccountID = "acct_team_shared"
+        let first = try self.makeOAuthAccount(
+            accountID: remoteAccountID,
+            email: "first-team@example.com",
+            isActive: true,
+            planType: "team",
+            localAccountID: "user-first__acct_team_shared"
+        )
+        let second = try self.makeOAuthAccount(
+            accountID: remoteAccountID,
+            email: "second-team@example.com",
+            isActive: false,
+            planType: "team",
+            localAccountID: "user-second__acct_team_shared"
+        )
+
+        _ = try service.importAccount(first, activate: true)
+        _ = try service.importAccount(second, activate: false)
+
+        let accounts = try service.exportAccounts()
+        XCTAssertEqual(accounts.count, 2)
+        XCTAssertEqual(Set(accounts.map(\.accountId)), [
+            "user-first__acct_team_shared",
+            "user-second__acct_team_shared",
+        ])
+        XCTAssertEqual(Set(accounts.map(\.remoteAccountId)), [remoteAccountID])
+        XCTAssertEqual(accounts.first(where: { $0.accountId == "user-first__acct_team_shared" })?.email, "first-team@example.com")
+        XCTAssertEqual(accounts.first(where: { $0.accountId == "user-second__acct_team_shared" })?.email, "second-team@example.com")
+    }
+
     func testImportAccountsKeepsCompatibleProviderActive() throws {
         let configStore = CodexBarConfigStore()
         let compatibleAccount = CodexBarProviderAccount(

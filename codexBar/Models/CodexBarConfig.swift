@@ -5,6 +5,31 @@ enum CodexBarProviderKind: String, Codable {
     case openAICompatible = "openai_compatible"
 }
 
+enum CodexBarUsageDisplayMode: String, Codable, CaseIterable, Identifiable {
+    case remaining
+    case used
+
+    var id: String { self.rawValue }
+
+    var title: String {
+        switch self {
+        case .remaining:
+            return L.remainingUsageDisplay
+        case .used:
+            return L.usedQuotaDisplay
+        }
+    }
+
+    var badgeTitle: String {
+        switch self {
+        case .remaining:
+            return L.remainingShort
+        case .used:
+            return L.usedShort
+        }
+    }
+}
+
 enum CodexBarAccountKind: String, Codable {
     case oauthTokens = "oauth_tokens"
     case apiKey = "api_key"
@@ -27,6 +52,64 @@ struct CodexBarActiveSelection: Codable {
     var accountId: String?
 }
 
+struct CodexBarDesktopSettings: Codable, Equatable {
+    var preferredCodexAppPath: String?
+
+    enum CodingKeys: String, CodingKey {
+        case preferredCodexAppPath
+    }
+
+    init(preferredCodexAppPath: String? = nil) {
+        self.preferredCodexAppPath = Self.normalizedPreferredCodexAppPath(preferredCodexAppPath)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.preferredCodexAppPath = Self.normalizedPreferredCodexAppPath(
+            try container.decodeIfPresent(String.self, forKey: .preferredCodexAppPath)
+        )
+    }
+
+    private static func normalizedPreferredCodexAppPath(_ path: String?) -> String? {
+        guard let trimmed = path?.trimmingCharacters(in: .whitespacesAndNewlines),
+              trimmed.isEmpty == false else {
+            return nil
+        }
+        return trimmed
+    }
+}
+
+enum CodexBarAutoRoutingPromptMode: String, Codable, CaseIterable, Identifiable {
+    case launchNewInstance
+    case remindOnly
+    case disabled
+
+    var id: String { self.rawValue }
+
+    var title: String {
+        switch self {
+        case .launchNewInstance:
+            return L.autoRoutingPromptModeLaunchNewInstance
+        case .remindOnly:
+            return L.autoRoutingPromptModeRemindOnly
+        case .disabled:
+            return L.autoRoutingPromptModeDisabled
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .launchNewInstance:
+            return L.autoRoutingPromptModeLaunchNewInstanceHint
+        case .remindOnly:
+            return L.autoRoutingPromptModeRemindOnlyHint
+        case .disabled:
+            return L.autoRoutingPromptModeDisabledHint
+        }
+    }
+
+}
+
 struct CodexBarAutoRoutingSettings: Codable, Equatable {
     var enabled: Bool
     var urgentThresholdPercent: Double
@@ -35,8 +118,22 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
     var cooldownSeconds: TimeInterval
     var manualOverrideGraceSeconds: TimeInterval
     var fullSweepIntervalSeconds: TimeInterval
+    var promptMode: CodexBarAutoRoutingPromptMode
     var pinnedAccountId: String?
     var excludedAccountIds: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case enabled
+        case urgentThresholdPercent
+        case switchThresholdPercent
+        case minImprovementPercent
+        case cooldownSeconds
+        case manualOverrideGraceSeconds
+        case fullSweepIntervalSeconds
+        case promptMode
+        case pinnedAccountId
+        case excludedAccountIds
+    }
 
     init(
         enabled: Bool = false,
@@ -46,6 +143,7 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
         cooldownSeconds: TimeInterval = 300,
         manualOverrideGraceSeconds: TimeInterval = 900,
         fullSweepIntervalSeconds: TimeInterval = 1_800,
+        promptMode: CodexBarAutoRoutingPromptMode = .launchNewInstance,
         pinnedAccountId: String? = nil,
         excludedAccountIds: [String] = []
     ) {
@@ -56,8 +154,100 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
         self.cooldownSeconds = cooldownSeconds
         self.manualOverrideGraceSeconds = manualOverrideGraceSeconds
         self.fullSweepIntervalSeconds = fullSweepIntervalSeconds
+        self.promptMode = promptMode
         self.pinnedAccountId = pinnedAccountId
         self.excludedAccountIds = excludedAccountIds
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.enabled = try container.decodeIfPresent(Bool.self, forKey: .enabled) ?? false
+        self.urgentThresholdPercent = try container.decodeIfPresent(Double.self, forKey: .urgentThresholdPercent) ?? 5
+        self.switchThresholdPercent = try container.decodeIfPresent(Double.self, forKey: .switchThresholdPercent) ?? 10
+        self.minImprovementPercent = try container.decodeIfPresent(Double.self, forKey: .minImprovementPercent) ?? 10
+        self.cooldownSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .cooldownSeconds) ?? 300
+        self.manualOverrideGraceSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .manualOverrideGraceSeconds) ?? 900
+        self.fullSweepIntervalSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .fullSweepIntervalSeconds) ?? 1_800
+        self.promptMode = try container.decodeIfPresent(CodexBarAutoRoutingPromptMode.self, forKey: .promptMode) ?? .launchNewInstance
+        self.pinnedAccountId = try container.decodeIfPresent(String.self, forKey: .pinnedAccountId)
+        self.excludedAccountIds = try container.decodeIfPresent([String].self, forKey: .excludedAccountIds) ?? []
+    }
+}
+
+struct CodexBarOpenAISettings: Codable, Equatable {
+    struct QuotaSortSettings: Codable, Equatable {
+        static let plusRelativeWeightRange = 1.0...20.0
+        static let teamRelativeToPlusRange = 1.0...3.0
+
+        var plusRelativeWeight: Double
+        var teamRelativeToPlusMultiplier: Double
+
+        enum CodingKeys: String, CodingKey {
+            case plusRelativeWeight
+            case teamRelativeToPlusMultiplier
+        }
+
+        init(
+            plusRelativeWeight: Double = 10,
+            teamRelativeToPlusMultiplier: Double = 1.5
+        ) {
+            self.plusRelativeWeight = Self.clamped(
+                plusRelativeWeight,
+                to: Self.plusRelativeWeightRange
+            )
+            self.teamRelativeToPlusMultiplier = Self.clamped(
+                teamRelativeToPlusMultiplier,
+                to: Self.teamRelativeToPlusRange
+            )
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                plusRelativeWeight: try container.decodeIfPresent(Double.self, forKey: .plusRelativeWeight) ?? 10,
+                teamRelativeToPlusMultiplier: try container.decodeIfPresent(Double.self, forKey: .teamRelativeToPlusMultiplier) ?? 1.5
+            )
+        }
+
+        var teamAbsoluteWeight: Double {
+            self.plusRelativeWeight * self.teamRelativeToPlusMultiplier
+        }
+
+        private static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
+            min(max(value, range.lowerBound), range.upperBound)
+        }
+    }
+
+    var accountOrder: [String]
+    var popupAlertThresholdPercent: Double
+    var usageDisplayMode: CodexBarUsageDisplayMode
+    var quotaSort: QuotaSortSettings
+
+    enum CodingKeys: String, CodingKey {
+        case accountOrder
+        case popupAlertThresholdPercent
+        case usageDisplayMode
+        case quotaSort
+    }
+
+    init(
+        accountOrder: [String] = [],
+        popupAlertThresholdPercent: Double = 20,
+        usageDisplayMode: CodexBarUsageDisplayMode = .used,
+        quotaSort: QuotaSortSettings = QuotaSortSettings()
+    ) {
+        self.accountOrder = accountOrder
+        self.popupAlertThresholdPercent = popupAlertThresholdPercent
+        self.usageDisplayMode = usageDisplayMode
+        self.quotaSort = quotaSort
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.accountOrder = try container.decodeIfPresent([String].self, forKey: .accountOrder) ?? []
+        self.popupAlertThresholdPercent = try container.decodeIfPresent(Double.self, forKey: .popupAlertThresholdPercent) ?? 20
+        self.usageDisplayMode = try container.decodeIfPresent(CodexBarUsageDisplayMode.self, forKey: .usageDisplayMode) ?? .used
+        self.quotaSort = try container.decodeIfPresent(QuotaSortSettings.self, forKey: .quotaSort) ?? QuotaSortSettings()
     }
 }
 
@@ -144,14 +334,17 @@ struct CodexBarProviderAccount: Codable, Identifiable, Equatable {
 
     func asTokenAccount(isActive: Bool) -> TokenAccount? {
         guard self.kind == .oauthTokens,
-              let accountId = self.openAIAccountId,
               let accessToken = self.accessToken,
               let refreshToken = self.refreshToken,
               let idToken = self.idToken else { return nil }
 
+        let localAccountID = self.id
+        let remoteAccountID = self.openAIAccountId ?? localAccountID
+
         return TokenAccount(
             email: self.email ?? self.label,
-            accountId: accountId,
+            accountId: localAccountID,
+            openAIAccountId: remoteAccountID,
             accessToken: accessToken,
             refreshToken: refreshToken,
             idToken: idToken,
@@ -177,7 +370,7 @@ struct CodexBarProviderAccount: Codable, Identifiable, Equatable {
             kind: .oauthTokens,
             label: account.email.isEmpty ? account.accountId : account.email,
             email: account.email,
-            openAIAccountId: account.accountId,
+            openAIAccountId: account.remoteAccountId,
             accessToken: account.accessToken,
             refreshToken: account.refreshToken,
             idToken: account.idToken,
@@ -244,20 +437,26 @@ struct CodexBarConfig: Codable {
     var version: Int
     var global: CodexBarGlobalSettings
     var active: CodexBarActiveSelection
+    var desktop: CodexBarDesktopSettings
     var autoRouting: CodexBarAutoRoutingSettings
+    var openAI: CodexBarOpenAISettings
     var providers: [CodexBarProvider]
 
     init(
         version: Int = 1,
         global: CodexBarGlobalSettings = CodexBarGlobalSettings(),
         active: CodexBarActiveSelection = CodexBarActiveSelection(),
+        desktop: CodexBarDesktopSettings = CodexBarDesktopSettings(),
         autoRouting: CodexBarAutoRoutingSettings = CodexBarAutoRoutingSettings(),
+        openAI: CodexBarOpenAISettings = CodexBarOpenAISettings(),
         providers: [CodexBarProvider] = []
     ) {
         self.version = version
         self.global = global
         self.active = active
+        self.desktop = desktop
         self.autoRouting = autoRouting
+        self.openAI = openAI
         self.providers = providers
     }
 
@@ -265,7 +464,9 @@ struct CodexBarConfig: Codable {
         case version
         case global
         case active
+        case desktop
         case autoRouting
+        case openAI
         case providers
     }
 
@@ -274,7 +475,9 @@ struct CodexBarConfig: Codable {
         self.version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
         self.global = try container.decodeIfPresent(CodexBarGlobalSettings.self, forKey: .global) ?? CodexBarGlobalSettings()
         self.active = try container.decodeIfPresent(CodexBarActiveSelection.self, forKey: .active) ?? CodexBarActiveSelection()
+        self.desktop = try container.decodeIfPresent(CodexBarDesktopSettings.self, forKey: .desktop) ?? CodexBarDesktopSettings()
         self.autoRouting = try container.decodeIfPresent(CodexBarAutoRoutingSettings.self, forKey: .autoRouting) ?? CodexBarAutoRoutingSettings()
+        self.openAI = try container.decodeIfPresent(CodexBarOpenAISettings.self, forKey: .openAI) ?? CodexBarOpenAISettings()
         self.providers = try container.decodeIfPresent([CodexBarProvider].self, forKey: .providers) ?? []
     }
 
@@ -301,7 +504,7 @@ extension CodexBarConfig {
         var provider = self.ensureOAuthProvider()
         let storedAccount: CodexBarProviderAccount
 
-        if let index = provider.accounts.firstIndex(where: { $0.openAIAccountId == account.accountId }) {
+        if let index = provider.accounts.firstIndex(where: { $0.id == account.accountId }) {
             let existing = provider.accounts[index]
             var updated = CodexBarProviderAccount.fromTokenAccount(account, existingID: existing.id)
             updated.addedAt = existing.addedAt ?? Date()
@@ -312,6 +515,7 @@ extension CodexBarConfig {
             let created = CodexBarProviderAccount.fromTokenAccount(account, existingID: account.accountId)
             provider.accounts.append(created)
             storedAccount = created
+            self.appendOpenAIAccountOrderIfNeeded(accountID: created.id)
         }
 
         if provider.activeAccountId == nil {
@@ -325,6 +529,7 @@ extension CodexBarConfig {
         }
 
         self.upsertProvider(provider)
+        self.normalizeOpenAIAccountOrder()
 
         let syncCodex = activate || (
             self.active.providerId == provider.id &&
@@ -337,7 +542,7 @@ extension CodexBarConfig {
         guard var provider = self.oauthProvider() else {
             throw TokenStoreError.providerNotFound
         }
-        guard let stored = provider.accounts.first(where: { $0.id == accountID || $0.openAIAccountId == accountID }) else {
+        guard let stored = self.oauthStoredAccount(in: provider, matching: accountID) else {
             throw TokenStoreError.accountNotFound
         }
 
@@ -352,7 +557,7 @@ extension CodexBarConfig {
         guard var provider = self.oauthProvider() else {
             throw TokenStoreError.providerNotFound
         }
-        guard let stored = provider.accounts.first(where: { $0.id == accountID || $0.openAIAccountId == accountID }) else {
+        guard let stored = self.oauthStoredAccount(in: provider, matching: accountID) else {
             throw TokenStoreError.accountNotFound
         }
 
@@ -370,6 +575,71 @@ extension CodexBarConfig {
             if lhs.isActive != rhs.isActive { return lhs.isActive }
             return lhs.email < rhs.email
         }
+    }
+
+    mutating func setOpenAIAccountOrder(_ accountOrder: [String]) {
+        self.openAI.accountOrder = Self.uniqueAccountIDs(from: accountOrder)
+        self.normalizeOpenAIAccountOrder()
+    }
+
+    mutating func removeOpenAIAccountOrder(accountID: String) {
+        self.openAI.accountOrder.removeAll { $0 == accountID }
+    }
+
+    mutating func normalizeOpenAIAccountOrder() {
+        let availableAccountIDs = self.oauthProvider()?.accounts.map(\.id) ?? []
+        let availableAccountIDSet = Set(availableAccountIDs)
+
+        var normalized: [String] = []
+        var seen: Set<String> = []
+
+        for accountID in self.openAI.accountOrder where availableAccountIDSet.contains(accountID) {
+            guard seen.insert(accountID).inserted else { continue }
+            normalized.append(accountID)
+        }
+
+        for accountID in availableAccountIDs where seen.insert(accountID).inserted {
+            normalized.append(accountID)
+        }
+
+        self.openAI.accountOrder = normalized
+    }
+
+    mutating func remapOAuthAccountReferences(using accountIDMapping: [String: String]) {
+        guard accountIDMapping.isEmpty == false else { return }
+
+        if let providerIndex = self.providers.firstIndex(where: { $0.kind == .openAIOAuth }) {
+            var provider = self.providers[providerIndex]
+            provider.accounts = provider.accounts.map { stored in
+                var updated = stored
+                if let remappedID = accountIDMapping[stored.id] {
+                    updated.id = remappedID
+                }
+                return updated
+            }
+            if let activeAccountId = provider.activeAccountId,
+               let remappedID = accountIDMapping[activeAccountId] {
+                provider.activeAccountId = remappedID
+            }
+            self.providers[providerIndex] = provider
+
+            if self.active.providerId == provider.id,
+               let activeAccountId = self.active.accountId,
+               let remappedID = accountIDMapping[activeAccountId] {
+                self.active.accountId = remappedID
+            }
+        }
+
+        self.openAI.accountOrder = Self.uniqueAccountIDs(
+            from: self.openAI.accountOrder.map { accountIDMapping[$0] ?? $0 }
+        )
+        if let pinnedAccountId = self.autoRouting.pinnedAccountId {
+            self.autoRouting.pinnedAccountId = accountIDMapping[pinnedAccountId] ?? pinnedAccountId
+        }
+        self.autoRouting.excludedAccountIds = Self.uniqueAccountIDs(
+            from: self.autoRouting.excludedAccountIds.map { accountIDMapping[$0] ?? $0 }
+        )
+        self.normalizeOpenAIAccountOrder()
     }
 
     private mutating func ensureOAuthProvider() -> CodexBarProvider {
@@ -393,5 +663,27 @@ extension CodexBarConfig {
         } else {
             self.providers.append(provider)
         }
+    }
+
+    private mutating func appendOpenAIAccountOrderIfNeeded(accountID: String) {
+        guard self.openAI.accountOrder.contains(accountID) == false else { return }
+        self.openAI.accountOrder.append(accountID)
+    }
+
+    private func oauthStoredAccount(in provider: CodexBarProvider, matching accountID: String) -> CodexBarProviderAccount? {
+        if let stored = provider.accounts.first(where: { $0.id == accountID }) {
+            return stored
+        }
+
+        let remoteMatches = provider.accounts.filter { $0.openAIAccountId == accountID }
+        if remoteMatches.count == 1 {
+            return remoteMatches[0]
+        }
+        return nil
+    }
+
+    private static func uniqueAccountIDs(from accountIDs: [String]) -> [String] {
+        var seen: Set<String> = []
+        return accountIDs.filter { seen.insert($0).inserted }
     }
 }

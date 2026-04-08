@@ -146,7 +146,9 @@ struct OpenAIAccountCSVService {
             }
 
             let declaredAccountID = value(for: "account_id")
-            if declaredAccountID.isEmpty == false && declaredAccountID != builtAccount.accountId {
+            if declaredAccountID.isEmpty == false &&
+                declaredAccountID != builtAccount.accountId &&
+                declaredAccountID != builtAccount.remoteAccountId {
                 throw OpenAIAccountCSVError.accountIDMismatch(row: rowNumber)
             }
 

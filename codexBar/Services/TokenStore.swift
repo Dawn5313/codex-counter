@@ -62,7 +62,8 @@ final class TokenStore: ObservableObject {
 
     func remove(_ account: TokenAccount) {
         guard var provider = self.oauthProvider() else { return }
-        provider.accounts.removeAll { $0.openAIAccountId == account.accountId }
+        provider.accounts.removeAll { $0.id == account.accountId }
+        self.config.removeOpenAIAccountOrder(accountID: account.accountId)
 
         if provider.accounts.isEmpty {
             self.config.providers.removeAll { $0.id == provider.id }
@@ -81,6 +82,7 @@ final class TokenStore: ObservableObject {
             self.upsertProvider(provider)
         }
 
+        self.config.normalizeOpenAIAccountOrder()
         self.persistIgnoringErrors(syncCodex: self.config.active.providerId == provider.id)
     }
 
@@ -227,6 +229,36 @@ final class TokenStore: ObservableObject {
 
     func markActiveAccount() {
         self.publishState()
+    }
+
+    func saveDesktopAndOpenAISettings(
+        accountOrder: [String],
+        popupAlertThresholdPercent: Double,
+        usageDisplayMode: CodexBarUsageDisplayMode,
+        plusRelativeWeight: Double,
+        teamRelativeToPlusMultiplier: Double,
+        preferredCodexAppPath: String?,
+        autoRoutingPromptMode: CodexBarAutoRoutingPromptMode
+    ) throws {
+        self.config.setOpenAIAccountOrder(accountOrder)
+        self.config.openAI.popupAlertThresholdPercent = min(max(popupAlertThresholdPercent, 0), 100)
+        self.config.openAI.usageDisplayMode = usageDisplayMode
+        self.config.openAI.quotaSort = CodexBarOpenAISettings.QuotaSortSettings(
+            plusRelativeWeight: plusRelativeWeight,
+            teamRelativeToPlusMultiplier: teamRelativeToPlusMultiplier
+        )
+        let trimmedPreferredPath = preferredCodexAppPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if trimmedPreferredPath.isEmpty {
+            self.config.desktop.preferredCodexAppPath = nil
+        } else if let validatedPath = CodexDesktopLaunchProbeService
+            .validatedPreferredCodexAppURL(from: trimmedPreferredPath)?
+            .path {
+            self.config.desktop.preferredCodexAppPath = validatedPath
+        } else {
+            throw TokenStoreError.invalidCodexAppPath
+        }
+        self.config.autoRouting.promptMode = autoRoutingPromptMode
+        try self.persist(syncCodex: false)
     }
 
     func hasStaleOAuthUsageSnapshot(maxAge: TimeInterval, now: Date = Date()) -> Bool {
@@ -395,12 +427,14 @@ enum TokenStoreError: LocalizedError {
     case accountNotFound
     case providerNotFound
     case invalidInput
+    case invalidCodexAppPath
 
     var errorDescription: String? {
         switch self {
         case .accountNotFound: return "未找到账号"
         case .providerNotFound: return "未找到 provider"
         case .invalidInput: return "输入无效"
+        case .invalidCodexAppPath: return L.codexAppPathInvalidSelection
         }
     }
 }

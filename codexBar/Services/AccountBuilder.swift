@@ -4,9 +4,10 @@ import Foundation
 struct AccountBuilder {
     static func build(from tokens: OAuthTokens) -> TokenAccount {
         let claims = decodeJWT(tokens.accessToken)
-        let authClaims = claims["https://api.openai.com/auth"] as? [String: Any] ?? [:]
+        let authClaims = self.authClaims(fromAccessToken: tokens.accessToken)
 
-        let accountId = authClaims["chatgpt_account_id"] as? String ?? ""
+        let accountId = self.localAccountID(fromAuthClaims: authClaims)
+        let openAIAccountId = self.openAIAccountID(fromAuthClaims: authClaims)
         let planType = authClaims["chatgpt_plan_type"] as? String ?? "free"
 
         // 从 id_token 取 email
@@ -30,12 +31,37 @@ struct AccountBuilder {
         return TokenAccount(
             email: email,
             accountId: accountId,
+            openAIAccountId: openAIAccountId,
             accessToken: tokens.accessToken,
             refreshToken: tokens.refreshToken,
             idToken: tokens.idToken,
             expiresAt: expiresAt ?? tokenExpiresAt,
             planType: planType
         )
+    }
+
+    static func authClaims(fromAccessToken accessToken: String) -> [String: Any] {
+        let claims = decodeJWT(accessToken)
+        return claims["https://api.openai.com/auth"] as? [String: Any] ?? [:]
+    }
+
+    static func localAccountID(fromAccessToken accessToken: String) -> String {
+        self.localAccountID(fromAuthClaims: self.authClaims(fromAccessToken: accessToken))
+    }
+
+    static func localAccountID(fromAuthClaims authClaims: [String: Any]) -> String {
+        (authClaims["chatgpt_account_user_id"] as? String)
+            ?? (authClaims["chatgpt_account_id"] as? String)
+            ?? ""
+    }
+
+    static func openAIAccountID(fromAccessToken accessToken: String) -> String {
+        self.openAIAccountID(fromAuthClaims: self.authClaims(fromAccessToken: accessToken))
+    }
+
+    static func openAIAccountID(fromAuthClaims authClaims: [String: Any]) -> String {
+        (authClaims["chatgpt_account_id"] as? String)
+            ?? self.localAccountID(fromAuthClaims: authClaims)
     }
 
     /// 解码 JWT payload（不验签）

@@ -9,7 +9,12 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
         var capturedEnvironment: [String: String] = [:]
 
         let service = CodexDesktopLaunchProbeService(
-            locateCodexApp: { codexAppURL },
+            locateCodexApp: {
+                CodexDesktopResolvedAppLocation(
+                    url: codexAppURL,
+                    source: .bundleIdentifierLookup
+                )
+            },
             launchApp: { appURL, environment in
                 capturedURL = appURL
                 capturedEnvironment = environment
@@ -66,6 +71,74 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
         }
     }
 
+    func testResolvedCodexAppLocationPrefersValidManualPath() throws {
+        let preferredURL = try self.makeFakeCodexApp(name: "Preferred")
+        let fallbackURL = try self.makeFakeCodexApp(name: "Fallback")
+
+        let service = CodexDesktopLaunchProbeService(
+            preferredAppPathProvider: { preferredURL.path },
+            locateCodexApp: {
+                CodexDesktopResolvedAppLocation(
+                    url: fallbackURL,
+                    source: .bundleIdentifierLookup
+                )
+            }
+        )
+
+        let resolved = try XCTUnwrap(service.resolvedCodexAppLocation())
+        XCTAssertEqual(resolved.url, preferredURL)
+        XCTAssertEqual(resolved.source, .preferredPath)
+    }
+
+    func testResolvedCodexAppLocationFallsBackWhenManualPathIsInvalid() throws {
+        let fallbackURL = try self.makeFakeCodexApp(name: "Fallback")
+        let invalidManualURL = try self.makeDirectory(named: "Fake/Codex.app")
+
+        let service = CodexDesktopLaunchProbeService(
+            preferredAppPathProvider: { invalidManualURL.path },
+            locateCodexApp: {
+                CodexDesktopResolvedAppLocation(
+                    url: fallbackURL,
+                    source: .applicationsFallback
+                )
+            }
+        )
+
+        let resolved = try XCTUnwrap(service.resolvedCodexAppLocation())
+        XCTAssertEqual(resolved.url, fallbackURL)
+        XCTAssertEqual(resolved.source, .applicationsFallback)
+    }
+
+    func testValidatedPreferredCodexAppURLRejectsFakeBundleWithoutExecutable() throws {
+        let fakeURL = try self.makeDirectory(named: "Fake/Codex.app")
+        let wrongNameURL = try self.makeFakeCodexApp(name: "WrongName", appName: "NotCodex.app")
+
+        XCTAssertNil(
+            CodexDesktopLaunchProbeService.validatedPreferredCodexAppURL(
+                from: fakeURL.path
+            )
+        )
+        XCTAssertNil(
+            CodexDesktopLaunchProbeService.validatedPreferredCodexAppURL(
+                from: wrongNameURL.path
+            )
+        )
+        XCTAssertNil(
+            CodexDesktopLaunchProbeService.validatedPreferredCodexAppURL(
+                from: "relative/Codex.app"
+            )
+        )
+    }
+
+    func testPreferredAppPathStatusReportsInvalidManualPath() throws {
+        let invalidManualURL = try self.makeDirectory(named: "Invalid/Codex.app")
+
+        XCTAssertEqual(
+            CodexDesktopLaunchProbeService.preferredAppPathStatus(for: invalidManualURL.path),
+            .manualInvalid(invalidManualURL.path)
+        )
+    }
+
     func testLatestHitReadsRecordedHitFile() throws {
         try CodexPaths.ensureDirectories()
         let hit = CodexDesktopLaunchProbeHit(
@@ -96,7 +169,12 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
         var capturedEnvironment: [String: String] = [:]
 
         let service = CodexDesktopLaunchProbeService(
-            locateCodexApp: { codexAppURL },
+            locateCodexApp: {
+                CodexDesktopResolvedAppLocation(
+                    url: codexAppURL,
+                    source: .bundleIdentifierLookup
+                )
+            },
             launchApp: { _, environment in
                 capturedEnvironment = environment
                 return nil
@@ -108,15 +186,18 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
             ]
         )
 
-        try await service.launchNewInstance()
+        _ = try await service.launchNewInstance()
 
         XCTAssertEqual(capturedEnvironment["PATH"], "/usr/bin:/bin")
         XCTAssertNil(capturedEnvironment["CODEXBAR_DESKTOP_PROBE_RUN_ID"])
         XCTAssertNil(capturedEnvironment["CODEXBAR_DESKTOP_PROBE_HITS_DIR"])
     }
 
-    private func makeFakeCodexApp() throws -> URL {
-        let appURL = CodexPaths.realHome.appendingPathComponent("Codex.app", isDirectory: true)
+    private func makeFakeCodexApp(
+        name: String = "Codex",
+        appName: String = "Codex.app"
+    ) throws -> URL {
+        let appURL = CodexPaths.realHome.appendingPathComponent("\(name)/\(appName)", isDirectory: true)
         let resourcesURL = appURL
             .appendingPathComponent("Contents", isDirectory: true)
             .appendingPathComponent("Resources", isDirectory: true)
@@ -128,6 +209,12 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
             ofItemAtPath: executableURL.path
         )
         return appURL
+    }
+
+    private func makeDirectory(named relativePath: String) throws -> URL {
+        let url = CodexPaths.realHome.appendingPathComponent(relativePath, isDirectory: true)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
     }
 
     private func date(_ value: String) -> Date {

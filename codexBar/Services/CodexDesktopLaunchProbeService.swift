@@ -1,15 +1,30 @@
 import AppKit
 import Foundation
 
-@MainActor
-private func defaultCodexDesktopAppLocator() -> URL? {
-    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") {
-        return url
+struct CodexDesktopResolvedAppLocation: Equatable {
+    enum Source: Equatable {
+        case preferredPath
+        case bundleIdentifierLookup
+        case applicationsFallback
     }
 
-    let fallback = URL(fileURLWithPath: "/Applications/Codex.app", isDirectory: true)
-    guard FileManager.default.fileExists(atPath: fallback.path) else { return nil }
-    return fallback
+    let url: URL
+    let source: Source
+}
+
+enum CodexDesktopPreferredAppPathStatus: Equatable {
+    case automatic
+    case manualValid(String)
+    case manualInvalid(String)
+}
+
+@MainActor
+private func defaultCodexDesktopAppLocator() -> CodexDesktopResolvedAppLocation? {
+    CodexDesktopLaunchProbeService.resolveAutomaticCodexAppLocation(
+        bundleIdentifierLookup: {
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex")
+        }
+    )
 }
 
 @MainActor
@@ -76,9 +91,11 @@ enum CodexDesktopLaunchProbeError: LocalizedError {
 final class CodexDesktopLaunchProbeService {
     static let shared = CodexDesktopLaunchProbeService()
 
-    typealias AppLocator = @MainActor () -> URL?
+    typealias PreferredAppPathProvider = @MainActor () -> String?
+    typealias AppLocator = @MainActor () -> CodexDesktopResolvedAppLocation?
     typealias Launcher = @MainActor (_ appURL: URL, _ environment: [String: String]) async throws -> NSRunningApplication?
 
+    private let preferredAppPathProvider: PreferredAppPathProvider
     private let locateCodexApp: AppLocator
     private let launchApp: Launcher
     private let fileManager: FileManager
@@ -87,6 +104,9 @@ final class CodexDesktopLaunchProbeService {
     private let makeUUID: () -> UUID
 
     init(
+        preferredAppPathProvider: @escaping PreferredAppPathProvider = {
+            TokenStore.shared.config.desktop.preferredCodexAppPath
+        },
         locateCodexApp: @escaping AppLocator = defaultCodexDesktopAppLocator,
         launchApp: @escaping Launcher = defaultCodexDesktopLauncher,
         fileManager: FileManager = .default,
@@ -94,6 +114,7 @@ final class CodexDesktopLaunchProbeService {
         now: @escaping () -> Date = Date.init,
         makeUUID: @escaping () -> UUID = UUID.init
     ) {
+        self.preferredAppPathProvider = preferredAppPathProvider
         self.locateCodexApp = locateCodexApp
         self.launchApp = launchApp
         self.fileManager = fileManager
@@ -102,15 +123,33 @@ final class CodexDesktopLaunchProbeService {
         self.makeUUID = makeUUID
     }
 
+    func resolvedCodexAppLocation() -> CodexDesktopResolvedAppLocation? {
+        if let preferredURL = Self.validatedPreferredCodexAppURL(
+            from: self.preferredAppPathProvider(),
+            fileManager: self.fileManager
+        ) {
+            return CodexDesktopResolvedAppLocation(
+                url: preferredURL,
+                source: .preferredPath
+            )
+        }
+
+        return self.locateCodexApp()
+    }
+
+    func preferredAppPathStatus() -> CodexDesktopPreferredAppPathStatus {
+        Self.preferredAppPathStatus(
+            for: self.preferredAppPathProvider(),
+            fileManager: self.fileManager
+        )
+    }
+
     func launchProbe() async throws -> CodexDesktopLaunchProbeState {
-        guard let appURL = self.locateCodexApp() else {
+        guard let appURL = self.resolvedCodexAppLocation()?.url else {
             throw CodexDesktopLaunchProbeError.codexAppNotFound
         }
 
-        let codexExecutableURL = appURL
-            .appendingPathComponent("Contents", isDirectory: true)
-            .appendingPathComponent("Resources", isDirectory: true)
-            .appendingPathComponent("codex")
+        let codexExecutableURL = Self.codexExecutableURL(for: appURL)
 
         guard self.fileManager.fileExists(atPath: codexExecutableURL.path) else {
             throw CodexDesktopLaunchProbeError.bundledCodexExecutableMissing
@@ -145,7 +184,7 @@ final class CodexDesktopLaunchProbeService {
     }
 
     func launchNewInstance() async throws -> NSRunningApplication? {
-        guard let appURL = self.locateCodexApp() else {
+        guard let appURL = self.resolvedCodexAppLocation()?.url else {
             throw CodexDesktopLaunchProbeError.codexAppNotFound
         }
 
@@ -205,6 +244,85 @@ final class CodexDesktopLaunchProbeService {
     func hit(for runID: String) -> CodexDesktopLaunchProbeHit? {
         let url = CodexPaths.managedLaunchHitsURL.appendingPathComponent("\(runID).json")
         return self.readHit(at: url)
+    }
+
+    nonisolated static func preferredAppPathStatus(
+        for preferredAppPath: String?,
+        fileManager: FileManager = .default
+    ) -> CodexDesktopPreferredAppPathStatus {
+        let trimmedPath = preferredAppPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard trimmedPath.isEmpty == false else { return .automatic }
+
+        if let validURL = self.validatedPreferredCodexAppURL(
+            from: trimmedPath,
+            fileManager: fileManager
+        ) {
+            return .manualValid(validURL.path)
+        }
+
+        return .manualInvalid(trimmedPath)
+    }
+
+    nonisolated static func validatedPreferredCodexAppURL(
+        from preferredAppPath: String?,
+        fileManager: FileManager = .default
+    ) -> URL? {
+        let trimmedPath = preferredAppPath?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard trimmedPath.isEmpty == false else { return nil }
+        guard (trimmedPath as NSString).isAbsolutePath else { return nil }
+
+        let appURL = URL(fileURLWithPath: trimmedPath, isDirectory: true).standardizedFileURL
+        guard self.isValidCodexAppURL(appURL, fileManager: fileManager) else { return nil }
+        return appURL
+    }
+
+    nonisolated static func resolveAutomaticCodexAppLocation(
+        bundleIdentifierLookup: () -> URL?,
+        fileManager: FileManager = .default,
+        applicationsFallbackURL: URL = URL(fileURLWithPath: "/Applications/Codex.app", isDirectory: true)
+    ) -> CodexDesktopResolvedAppLocation? {
+        if let bundleLookupURL = bundleIdentifierLookup()?.standardizedFileURL,
+           self.isValidCodexAppURL(bundleLookupURL, fileManager: fileManager) {
+            return CodexDesktopResolvedAppLocation(
+                url: bundleLookupURL,
+                source: .bundleIdentifierLookup
+            )
+        }
+
+        let fallbackURL = applicationsFallbackURL.standardizedFileURL
+        guard self.isValidCodexAppURL(fallbackURL, fileManager: fileManager) else {
+            return nil
+        }
+
+        return CodexDesktopResolvedAppLocation(
+            url: fallbackURL,
+            source: .applicationsFallback
+        )
+    }
+
+    nonisolated static func isValidCodexAppURL(
+        _ appURL: URL,
+        fileManager: FileManager = .default
+    ) -> Bool {
+        guard appURL.isFileURL else { return false }
+        guard (appURL.path as NSString).isAbsolutePath else { return false }
+        guard appURL.pathExtension == "app" else { return false }
+        guard appURL.lastPathComponent == "Codex.app" else { return false }
+
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: appURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            return false
+        }
+
+        let codexExecutableURL = self.codexExecutableURL(for: appURL)
+        return fileManager.fileExists(atPath: codexExecutableURL.path)
+    }
+
+    nonisolated static func codexExecutableURL(for appURL: URL) -> URL {
+        appURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+            .appendingPathComponent("codex")
     }
 
     private func readHit(at url: URL) -> CodexDesktopLaunchProbeHit? {

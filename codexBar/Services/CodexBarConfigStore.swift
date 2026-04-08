@@ -26,20 +26,34 @@ final class CodexBarConfigStore {
         ("s", "S", "https://api.0vo.dev/v1", "S_OAI_KEY"),
         ("htj", "HTJ", "https://rhino.tjhtj.com", "HTJ_OAI_KEY"),
     ]
+    private let switchJournalStore: SwitchJournalStore
+
+    init(switchJournalStore: SwitchJournalStore = SwitchJournalStore()) {
+        self.switchJournalStore = switchJournalStore
+    }
 
     func loadOrMigrate() throws -> CodexBarConfig {
         try CodexPaths.ensureDirectories()
+        let loaded: CodexBarConfig
         if FileManager.default.fileExists(atPath: CodexPaths.barConfigURL.path) {
             do {
-                return try self.load()
+                loaded = try self.load()
             } catch {
                 try self.backupForeignConfig()
+                loaded = try self.migrateFromLegacy()
             }
+        } else {
+            loaded = try self.migrateFromLegacy()
         }
 
-        let config = try self.migrateFromLegacy()
-        try self.save(config)
-        return config
+        let normalized = self.normalizeOAuthAccountIdentities(in: loaded)
+        if FileManager.default.fileExists(atPath: CodexPaths.barConfigURL.path) == false || normalized.changed {
+            try self.save(normalized.config)
+            if normalized.migratedAccountIDs.isEmpty == false {
+                try? self.switchJournalStore.remapOpenAIOAuthAccountIDs(using: normalized.migratedAccountIDs)
+            }
+        }
+        return normalized.config
     }
 
     func load() throws -> CodexBarConfig {
@@ -126,7 +140,7 @@ final class CodexBarConfigStore {
 
         if let tokens = auth["tokens"] as? [String: Any],
            let imported = self.accountFromAuthTokens(tokens) {
-            if importedAccounts.contains(where: { $0.openAIAccountId == imported.openAIAccountId }) == false {
+            if importedAccounts.contains(where: { $0.id == imported.id }) == false {
                 importedAccounts.append(imported)
             }
         }
@@ -148,8 +162,24 @@ final class CodexBarConfigStore {
     private func accountFromAuthTokens(_ tokens: [String: Any]) -> CodexBarProviderAccount? {
         guard let accessToken = tokens["access_token"] as? String,
               let refreshToken = tokens["refresh_token"] as? String,
-              let idToken = tokens["id_token"] as? String,
-              let accountId = tokens["account_id"] as? String else { return nil }
+              let idToken = tokens["id_token"] as? String else { return nil }
+
+        let account = AccountBuilder.build(
+            from: OAuthTokens(
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+                idToken: idToken
+            )
+        )
+        let fallbackRemoteAccountID = tokens["account_id"] as? String ?? ""
+        guard account.accountId.isEmpty == false || fallbackRemoteAccountID.isEmpty == false else { return nil }
+        var normalizedAccount = account
+        if normalizedAccount.accountId.isEmpty {
+            normalizedAccount.accountId = fallbackRemoteAccountID
+        }
+        if normalizedAccount.openAIAccountId.isEmpty {
+            normalizedAccount.openAIAccountId = fallbackRemoteAccountID
+        }
 
         let idClaims = AccountBuilder.decodeJWT(idToken)
         let email = idClaims["email"] as? String
@@ -158,19 +188,11 @@ final class CodexBarConfigStore {
         let formatter = ISO8601DateFormatter()
         let lastRefresh = formatter.date(from: activeUntil ?? "")
 
-        return CodexBarProviderAccount(
-            id: accountId,
-            kind: .oauthTokens,
-            label: email ?? String(accountId.prefix(8)),
-            email: email,
-            openAIAccountId: accountId,
-            accessToken: accessToken,
-            refreshToken: refreshToken,
-            idToken: idToken,
-            lastRefresh: lastRefresh,
-            addedAt: Date(),
-            planType: "free"
-        )
+        var stored = CodexBarProviderAccount.fromTokenAccount(normalizedAccount, existingID: normalizedAccount.accountId)
+        stored.email = email ?? stored.email
+        stored.label = stored.email ?? String(stored.id.prefix(8))
+        stored.lastRefresh = lastRefresh
+        return stored
     }
 
     private func makeImportedProviderIfNeeded(
@@ -212,9 +234,22 @@ final class CodexBarConfigStore {
         }
 
         if let tokens = auth["tokens"] as? [String: Any],
-           let accountId = tokens["account_id"] as? String,
+           let accessToken = tokens["access_token"] as? String,
+           let refreshToken = tokens["refresh_token"] as? String,
+           let idToken = tokens["id_token"] as? String,
            let provider = providers.first(where: { $0.kind == .openAIOAuth }) {
-            let selected = provider.accounts.first(where: { $0.openAIAccountId == accountId }) ?? provider.activeAccount
+            let activeAccount = AccountBuilder.build(
+                from: OAuthTokens(
+                    accessToken: accessToken,
+                    refreshToken: refreshToken,
+                    idToken: idToken
+                )
+            )
+            let fallbackRemoteAccountID = tokens["account_id"] as? String ?? ""
+            let remoteAccountID = activeAccount.remoteAccountId.isEmpty ? fallbackRemoteAccountID : activeAccount.remoteAccountId
+            let selected = provider.accounts.first(where: { $0.id == activeAccount.accountId })
+                ?? self.uniqueOAuthAccount(in: provider, matchingRemoteAccountID: remoteAccountID)
+                ?? provider.activeAccount
             return CodexBarActiveSelection(providerId: provider.id, accountId: selected?.id)
         }
 
@@ -226,6 +261,90 @@ final class CodexBarConfigStore {
 
         let fallbackProvider = providers.first
         return CodexBarActiveSelection(providerId: fallbackProvider?.id, accountId: fallbackProvider?.activeAccount?.id)
+    }
+
+    private func normalizeOAuthAccountIdentities(
+        in original: CodexBarConfig
+    ) -> (config: CodexBarConfig, migratedAccountIDs: [String: String], changed: Bool) {
+        var config = original
+        guard let providerIndex = config.providers.firstIndex(where: { $0.kind == .openAIOAuth }) else {
+            return (config, [:], false)
+        }
+
+        var provider = config.providers[providerIndex]
+        var migratedAccountIDs: [String: String] = [:]
+        var migratedAccounts: [CodexBarProviderAccount] = []
+        var changed = false
+
+        for stored in provider.accounts {
+            guard stored.kind == .oauthTokens,
+                  let accessToken = stored.accessToken,
+                  accessToken.isEmpty == false else {
+                migratedAccounts.append(stored)
+                continue
+            }
+
+            let localAccountID = AccountBuilder.localAccountID(fromAccessToken: accessToken)
+            let remoteAccountID = AccountBuilder.openAIAccountID(fromAccessToken: accessToken)
+            var updated = stored
+
+            if localAccountID.isEmpty == false, updated.id != localAccountID {
+                migratedAccountIDs[updated.id] = localAccountID
+                updated.id = localAccountID
+                changed = true
+            }
+
+            if remoteAccountID.isEmpty == false, updated.openAIAccountId != remoteAccountID {
+                updated.openAIAccountId = remoteAccountID
+                changed = true
+            }
+
+            if let existingIndex = migratedAccounts.firstIndex(where: { $0.id == updated.id }) {
+                migratedAccounts[existingIndex] = self.mergeOAuthAccount(
+                    existing: migratedAccounts[existingIndex],
+                    incoming: updated
+                )
+                changed = true
+            } else {
+                migratedAccounts.append(updated)
+            }
+        }
+
+        provider.accounts = migratedAccounts
+        config.providers[providerIndex] = provider
+        config.remapOAuthAccountReferences(using: migratedAccountIDs)
+        return (config, migratedAccountIDs, changed)
+    }
+
+    private func mergeOAuthAccount(
+        existing: CodexBarProviderAccount,
+        incoming: CodexBarProviderAccount
+    ) -> CodexBarProviderAccount {
+        var merged = incoming
+        merged.label = existing.label
+        merged.addedAt = existing.addedAt ?? incoming.addedAt
+        merged.email = incoming.email ?? existing.email
+        merged.lastRefresh = incoming.lastRefresh ?? existing.lastRefresh
+        merged.primaryUsedPercent = incoming.primaryUsedPercent ?? existing.primaryUsedPercent
+        merged.secondaryUsedPercent = incoming.secondaryUsedPercent ?? existing.secondaryUsedPercent
+        merged.primaryResetAt = incoming.primaryResetAt ?? existing.primaryResetAt
+        merged.secondaryResetAt = incoming.secondaryResetAt ?? existing.secondaryResetAt
+        merged.primaryLimitWindowSeconds = incoming.primaryLimitWindowSeconds ?? existing.primaryLimitWindowSeconds
+        merged.secondaryLimitWindowSeconds = incoming.secondaryLimitWindowSeconds ?? existing.secondaryLimitWindowSeconds
+        merged.lastChecked = incoming.lastChecked ?? existing.lastChecked
+        merged.isSuspended = incoming.isSuspended ?? existing.isSuspended
+        merged.tokenExpired = incoming.tokenExpired ?? existing.tokenExpired
+        merged.organizationName = incoming.organizationName ?? existing.organizationName
+        return merged
+    }
+
+    private func uniqueOAuthAccount(
+        in provider: CodexBarProvider,
+        matchingRemoteAccountID accountID: String
+    ) -> CodexBarProviderAccount? {
+        guard accountID.isEmpty == false else { return nil }
+        let matches = provider.accounts.filter { $0.openAIAccountId == accountID }
+        return matches.count == 1 ? matches[0] : nil
     }
 
     private func readLegacyToml() -> LegacyCodexTomlSnapshot {

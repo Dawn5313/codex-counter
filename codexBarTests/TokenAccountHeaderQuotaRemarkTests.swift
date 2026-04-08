@@ -142,6 +142,31 @@ final class TokenAccountHeaderQuotaRemarkTests: XCTestCase {
         XCTAssertEqual(account.usageWindowDisplays.map(\.label), ["5h", "7d"])
     }
 
+    func testRemainingUsageDisplayShowsRemainingPercentages() {
+        let account = makeAccount(
+            primaryUsedPercent: 35,
+            secondaryUsedPercent: 80,
+            primaryLimitWindowSeconds: 18_000,
+            secondaryLimitWindowSeconds: 604_800
+        )
+
+        let displays = account.usageWindowDisplays(mode: .remaining)
+
+        XCTAssertEqual(displays.map(\.displayPercent), [65, 20])
+    }
+
+    func testPopupAlertThresholdUsesRemainingQuota() {
+        let account = makeAccount(
+            primaryUsedPercent: 85,
+            secondaryUsedPercent: 10,
+            primaryLimitWindowSeconds: 18_000,
+            secondaryLimitWindowSeconds: 604_800
+        )
+
+        XCTAssertTrue(account.isBelowPopupAlertThreshold(20))
+        XCTAssertFalse(account.isBelowPopupAlertThreshold(10))
+    }
+
     private func makeAccount(
         email: String = "account@example.com",
         accountId: String = UUID().uuidString,

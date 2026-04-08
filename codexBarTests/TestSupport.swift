@@ -76,13 +76,24 @@ class CodexBarTestCase: XCTestCase {
         email: String,
         refreshToken: String? = nil,
         isActive: Bool = false,
-        planType: String = "plus"
+        planType: String = "plus",
+        localAccountID: String? = nil
     ) throws -> TokenAccount {
+        let resolvedLocalAccountID = localAccountID ?? accountID
+        let resolvedUserID: String
+        if let userComponent = resolvedLocalAccountID.split(separator: "__").first, userComponent.hasPrefix("user-") {
+            resolvedUserID = String(userComponent)
+        } else {
+            resolvedUserID = "user-\(resolvedLocalAccountID)"
+        }
         let accessToken = try self.makeJWT(
             payload: [
                 "exp": Date(timeIntervalSinceNow: 3_600).timeIntervalSince1970,
                 "https://api.openai.com/auth": [
                     "chatgpt_account_id": accountID,
+                    "chatgpt_account_user_id": resolvedLocalAccountID,
+                    "chatgpt_user_id": resolvedUserID,
+                    "user_id": resolvedUserID,
                     "chatgpt_plan_type": planType,
                 ],
             ]

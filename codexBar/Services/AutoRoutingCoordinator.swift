@@ -29,7 +29,8 @@ enum AutoRoutingPolicy {
 
     nonisolated static func bestCandidate(
         from accounts: [TokenAccount],
-        settings: CodexBarAutoRoutingSettings
+        settings: CodexBarAutoRoutingSettings,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init()
     ) -> TokenAccount? {
         let eligible = accounts.filter { self.isEligible($0, settings: settings) }
 
@@ -38,7 +39,13 @@ enum AutoRoutingPolicy {
             return pinned
         }
 
-        return eligible.sorted(by: OpenAIAccountListLayout.accountPrecedes).first
+        return eligible.sorted {
+            OpenAIAccountListLayout.accountPrecedes(
+                $0,
+                $1,
+                quotaSortSettings: quotaSortSettings
+            )
+        }.first
     }
 
     nonisolated static func hardFailoverReason(for account: TokenAccount) -> AutoRoutingSwitchReason? {
@@ -55,9 +62,15 @@ enum AutoRoutingPolicy {
         from accounts: [TokenAccount],
         currentAccountID: String?,
         settings: CodexBarAutoRoutingSettings,
-        fallbackReason: AutoRoutingSwitchReason
+        fallbackReason: AutoRoutingSwitchReason,
+        popupAlertThresholdPercent: Double = 20,
+        quotaSortSettings: CodexBarOpenAISettings.QuotaSortSettings = .init()
     ) -> Decision? {
-        guard let candidate = self.bestCandidate(from: accounts, settings: settings) else {
+        guard let candidate = self.bestCandidate(
+            from: accounts,
+            settings: settings,
+            quotaSortSettings: quotaSortSettings
+        ) else {
             return nil
         }
 
@@ -72,8 +85,12 @@ enum AutoRoutingPolicy {
             return Decision(account: candidate, reason: failoverReason)
         }
 
-        guard current.isDegradedForNextUseRouting else { return nil }
-        guard OpenAIAccountListLayout.accountPrecedes(candidate, current) else { return nil }
+        guard current.isBelowPopupAlertThreshold(popupAlertThresholdPercent) else { return nil }
+        guard OpenAIAccountListLayout.accountPrecedes(
+            candidate,
+            current,
+            quotaSortSettings: quotaSortSettings
+        ) else { return nil }
 
         return Decision(account: candidate, reason: .autoThreshold)
     }
@@ -84,6 +101,63 @@ enum AutoRoutingPolicy {
     ) -> Bool {
         guard settings.excludedAccountIds.contains(account.accountId) == false else { return false }
         return account.isAvailableForNextUseRouting
+    }
+}
+
+enum AutoRoutingDecisionPlan {
+    case none(clearSuppressedPrompt: Bool)
+    case suppressed
+    case thresholdPrompt(
+        mode: CodexBarAutoRoutingPromptMode,
+        suppressedPromptKey: String,
+        decision: AutoRoutingPolicy.Decision
+    )
+    case forcedFailover(AutoRoutingPolicy.Decision)
+}
+
+enum AutoRoutingDecisionPlanner {
+    nonisolated static func promptKey(
+        currentAccountID: String?,
+        decision: AutoRoutingPolicy.Decision
+    ) -> String {
+        let currentAccountID = currentAccountID ?? "none"
+        return "\(currentAccountID)->\(decision.account.accountId):\(decision.reason.rawValue)"
+    }
+
+    nonisolated static func plan(
+        decision: AutoRoutingPolicy.Decision?,
+        promptMode: CodexBarAutoRoutingPromptMode,
+        currentAccountID: String?,
+        suppressedPromptKey: String?
+    ) -> AutoRoutingDecisionPlan {
+        guard let decision else {
+            return .none(clearSuppressedPrompt: true)
+        }
+
+        switch decision.reason {
+        case .autoUnavailable, .autoExhausted:
+            return .forcedFailover(decision)
+        case .autoThreshold:
+            switch promptMode {
+            case .disabled:
+                return .none(clearSuppressedPrompt: false)
+            case .launchNewInstance, .remindOnly:
+                let promptKey = self.promptKey(
+                    currentAccountID: currentAccountID,
+                    decision: decision
+                )
+                guard suppressedPromptKey != promptKey else {
+                    return .suppressed
+                }
+                return .thresholdPrompt(
+                    mode: promptMode,
+                    suppressedPromptKey: promptKey,
+                    decision: decision
+                )
+            }
+        case .manual, .startupBestAccount:
+            return .none(clearSuppressedPrompt: false)
+        }
     }
 }
 
@@ -151,7 +225,9 @@ final class AutoRoutingCoordinator {
             from: self.store.accounts,
             currentAccountID: self.store.activeAccount()?.accountId,
             settings: self.currentSettings,
-            fallbackReason: fallbackReason
+            fallbackReason: fallbackReason,
+            popupAlertThresholdPercent: self.store.config.openAI.popupAlertThresholdPercent,
+            quotaSortSettings: self.store.config.openAI.quotaSort
         )
     }
 

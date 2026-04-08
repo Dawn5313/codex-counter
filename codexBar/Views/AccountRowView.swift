@@ -6,6 +6,8 @@ struct AccountRowView: View {
     let isNextUseTarget: Bool
     let runningThreadCount: Int
     let isRefreshing: Bool
+    let popupAlertThresholdPercent: Double
+    let usageDisplayMode: CodexBarUsageDisplayMode
     let onActivate: () -> Void
     let onRefresh: () -> Void
     let onReauth: () -> Void
@@ -123,7 +125,7 @@ struct AccountRowView: View {
     @ViewBuilder
     private var usageSummary: some View {
         HStack(spacing: 6) {
-            ForEach(Array(account.usageWindowDisplays.enumerated()), id: \.offset) { index, window in
+            ForEach(Array(account.usageWindowDisplays(mode: self.usageDisplayMode).enumerated()), id: \.offset) { index, window in
                 if index > 0 {
                     Text("•")
                         .font(.system(size: 9))
@@ -132,9 +134,9 @@ struct AccountRowView: View {
                 Text(window.label)
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
-                Text("\(Int(window.usedPercent))%")
+                Text("\(Int(window.displayPercent))%")
                     .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(usageColor(window.usedPercent))
+                    .foregroundColor(usageColor(window))
             }
         }
     }
@@ -148,7 +150,7 @@ struct AccountRowView: View {
     private var statusColor: Color {
         if account.isBanned { return .red }
         if account.quotaExhausted { return .orange }
-        if account.isDegradedForNextUseRouting { return .yellow }
+        if account.isBelowPopupAlertThreshold(self.popupAlertThresholdPercent) { return .yellow }
         return .green
     }
 
@@ -156,7 +158,7 @@ struct AccountRowView: View {
         if isNextUseTarget { return Color.accentColor.opacity(0.14) }
         if account.isBanned { return Color.red.opacity(0.045) }
         if account.quotaExhausted { return Color.orange.opacity(0.05) }
-        if account.isDegradedForNextUseRouting {
+        if account.isBelowPopupAlertThreshold(self.popupAlertThresholdPercent) {
             return Color.yellow.opacity(0.05)
         }
         return Color.secondary.opacity(0.055)
@@ -166,7 +168,7 @@ struct AccountRowView: View {
         if isNextUseTarget { return Color.accentColor.opacity(0.28) }
         if account.isBanned { return Color.red.opacity(0.12) }
         if account.quotaExhausted { return Color.orange.opacity(0.14) }
-        if account.isDegradedForNextUseRouting {
+        if account.isBelowPopupAlertThreshold(self.popupAlertThresholdPercent) {
             return Color.yellow.opacity(0.14)
         }
         return Color.primary.opacity(0.08)
@@ -180,9 +182,18 @@ struct AccountRowView: View {
         }
     }
 
-    private func usageColor(_ percent: Double) -> Color {
-        if percent >= 90 { return .red }
-        if percent >= 70 { return .orange }
-        return .green
+    private func usageColor(_ window: UsageWindowDisplay) -> Color {
+        if window.usedPercent >= 100 { return .red }
+        if self.popupAlertThresholdPercent > 0 && window.remainingPercent <= self.popupAlertThresholdPercent {
+            return .orange
+        }
+
+        switch self.usageDisplayMode {
+        case .remaining:
+            return .green
+        case .used:
+            if window.usedPercent >= 70 { return .orange }
+            return .green
+        }
     }
 }
