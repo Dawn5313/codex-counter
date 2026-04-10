@@ -15,17 +15,19 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         coordinator.update(\.accountOrderingMode, to: .manual, field: .accountOrderingMode)
         coordinator.update(\.manualActivationBehavior, to: .launchNewInstance, field: .manualActivationBehavior)
         coordinator.selectedPage = .usage
-        coordinator.update(\.popupAlertThresholdPercent, to: 35, field: .popupAlertThresholdPercent)
-        coordinator.selectedPage = .recommendationPrompt
-        coordinator.update(\.autoRoutingPromptMode, to: .remindOnly, field: .autoRoutingPromptMode)
+        coordinator.update(\.usageDisplayMode, to: .remaining, field: .usageDisplayMode)
+        coordinator.update(\.plusRelativeWeight, to: 12, field: .plusRelativeWeight)
+        coordinator.selectedPage = .codexAppPath
+        coordinator.update(\.preferredCodexAppPath, to: "/Applications/Codex.app", field: .preferredCodexAppPath)
         coordinator.selectedPage = .accounts
 
         XCTAssertEqual(coordinator.draft.accountOrderingMode, .manual)
         XCTAssertEqual(coordinator.draft.manualActivationBehavior, .launchNewInstance)
         coordinator.selectedPage = .usage
-        XCTAssertEqual(coordinator.draft.popupAlertThresholdPercent, 35)
-        coordinator.selectedPage = .recommendationPrompt
-        XCTAssertEqual(coordinator.draft.autoRoutingPromptMode, .remindOnly)
+        XCTAssertEqual(coordinator.draft.usageDisplayMode, .remaining)
+        XCTAssertEqual(coordinator.draft.plusRelativeWeight, 12)
+        coordinator.selectedPage = .codexAppPath
+        XCTAssertEqual(coordinator.draft.preferredCodexAppPath, "/Applications/Codex.app")
     }
 
     func testManualAccountOrderSectionVisibilityFollowsOrderingMode() {
@@ -62,9 +64,11 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         coordinator.setAccountOrder(["acct_beta", "acct_alpha"])
         coordinator.update(\.manualActivationBehavior, to: .launchNewInstance, field: .manualActivationBehavior)
         coordinator.selectedPage = .usage
-        coordinator.update(\.popupAlertThresholdPercent, to: 30, field: .popupAlertThresholdPercent)
-        coordinator.selectedPage = .recommendationPrompt
-        coordinator.update(\.autoRoutingPromptMode, to: .remindOnly, field: .autoRoutingPromptMode)
+        coordinator.update(\.usageDisplayMode, to: .remaining, field: .usageDisplayMode)
+        coordinator.update(\.plusRelativeWeight, to: 12, field: .plusRelativeWeight)
+        coordinator.update(\.teamRelativeToPlusMultiplier, to: 2.2, field: .teamRelativeToPlusMultiplier)
+        coordinator.selectedPage = .codexAppPath
+        coordinator.update(\.preferredCodexAppPath, to: "/Applications/Codex.app", field: .preferredCodexAppPath)
 
         let requests = try coordinator.save(using: sink)
 
@@ -80,17 +84,15 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(
             requests.openAIUsage,
             OpenAIUsageSettingsUpdate(
-                popupAlertThresholdPercent: 30,
-                usageDisplayMode: .used,
-                plusRelativeWeight: 10,
-                teamRelativeToPlusMultiplier: 1.5
+                usageDisplayMode: .remaining,
+                plusRelativeWeight: 12,
+                teamRelativeToPlusMultiplier: 2.2
             )
         )
         XCTAssertEqual(
-            requests.autoRoutingPrompt,
-            AutoRoutingPromptSettingsUpdate(promptMode: .remindOnly)
+            requests.desktop,
+            DesktopSettingsUpdate(preferredCodexAppPath: "/Applications/Codex.app")
         )
-        XCTAssertNil(requests.desktop)
 
         let reopened = SettingsWindowCoordinator(
             config: sink.config,
@@ -99,8 +101,10 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         XCTAssertEqual(reopened.draft.accountOrder, ["acct_beta", "acct_alpha"])
         XCTAssertEqual(reopened.draft.accountOrderingMode, .manual)
         XCTAssertEqual(reopened.draft.manualActivationBehavior, .launchNewInstance)
-        XCTAssertEqual(reopened.draft.popupAlertThresholdPercent, 30)
-        XCTAssertEqual(reopened.draft.autoRoutingPromptMode, .remindOnly)
+        XCTAssertEqual(reopened.draft.usageDisplayMode, .remaining)
+        XCTAssertEqual(reopened.draft.plusRelativeWeight, 12)
+        XCTAssertEqual(reopened.draft.teamRelativeToPlusMultiplier, 2.2)
+        XCTAssertEqual(reopened.draft.preferredCodexAppPath, "/Applications/Codex.app")
     }
 
     func testCancelRollsBackAcrossPagesAndDoesNotTriggerRequests() {
@@ -117,9 +121,10 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
 
         coordinator.update(\.manualActivationBehavior, to: .launchNewInstance, field: .manualActivationBehavior)
         coordinator.selectedPage = .usage
-        coordinator.update(\.popupAlertThresholdPercent, to: 45, field: .popupAlertThresholdPercent)
-        coordinator.selectedPage = .recommendationPrompt
-        coordinator.update(\.autoRoutingPromptMode, to: .remindOnly, field: .autoRoutingPromptMode)
+        coordinator.update(\.usageDisplayMode, to: .remaining, field: .usageDisplayMode)
+        coordinator.update(\.plusRelativeWeight, to: 14, field: .plusRelativeWeight)
+        coordinator.selectedPage = .codexAppPath
+        coordinator.update(\.preferredCodexAppPath, to: "/Applications/Codex.app", field: .preferredCodexAppPath)
 
         coordinator.cancel()
 
@@ -145,7 +150,7 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         )
         var closeCount = 0
 
-        coordinator.update(\.autoRoutingPromptMode, to: .remindOnly, field: .autoRoutingPromptMode)
+        coordinator.update(\.usageDisplayMode, to: .remaining, field: .usageDisplayMode)
         coordinator.saveAndClose(using: sink) {
             closeCount += 1
         }
@@ -166,14 +171,14 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         )
         var closeCount = 0
 
-        coordinator.update(\.autoRoutingPromptMode, to: .remindOnly, field: .autoRoutingPromptMode)
+        coordinator.update(\.usageDisplayMode, to: .remaining, field: .usageDisplayMode)
         coordinator.cancelAndClose {
             closeCount += 1
         }
 
         XCTAssertEqual(closeCount, 1)
         XCTAssertTrue(sink.appliedRequests.isEmpty)
-        XCTAssertEqual(coordinator.draft.autoRoutingPromptMode, .launchNewInstance)
+        XCTAssertEqual(coordinator.draft.usageDisplayMode, .used)
     }
 
     func testSaveAndCloseKeepsWindowOpenWhenSaveFails() {
@@ -188,7 +193,7 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
         let sink = FailingSettingsSaveSink()
         var closeCount = 0
 
-        coordinator.update(\.autoRoutingPromptMode, to: .remindOnly, field: .autoRoutingPromptMode)
+        coordinator.update(\.usageDisplayMode, to: .remaining, field: .usageDisplayMode)
         coordinator.saveAndClose(using: sink) {
             closeCount += 1
         }
@@ -211,7 +216,7 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
 
         var externalConfig = self.makeConfig()
         externalConfig.openAI.accountOrderingMode = .manual
-        externalConfig.autoRouting.promptMode = .remindOnly
+        externalConfig.openAI.usageDisplayMode = .remaining
         externalConfig.openAI.manualActivationBehavior = .updateConfigOnly
 
         coordinator.reconcileExternalState(
@@ -221,7 +226,7 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(coordinator.draft.accountOrderingMode, .manual)
         XCTAssertEqual(coordinator.draft.manualActivationBehavior, .launchNewInstance)
-        XCTAssertEqual(coordinator.draft.autoRoutingPromptMode, .remindOnly)
+        XCTAssertEqual(coordinator.draft.usageDisplayMode, .remaining)
     }
 
     func testReconcileExternalStateKeepsExplicitlyEditedFieldEvenIfValueMatchesOriginalBaseline() {
@@ -349,7 +354,7 @@ final class SettingsWindowCoordinatorTests: XCTestCase {
                 providerId: "openai-oauth",
                 accountId: "acct_alpha"
             ),
-            autoRouting: CodexBarAutoRoutingSettings(promptMode: .launchNewInstance),
+            autoRouting: CodexBarAutoRoutingSettings(),
             openAI: CodexBarOpenAISettings(
                 accountOrder: accountOrder,
                 accountOrderingMode: accountOrderingMode,

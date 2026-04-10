@@ -8,7 +8,6 @@ struct OpenAIAccountSettingsUpdate: Equatable {
 }
 
 struct OpenAIUsageSettingsUpdate: Equatable {
-    var popupAlertThresholdPercent: Double
     var usageDisplayMode: CodexBarUsageDisplayMode
     var plusRelativeWeight: Double
     var teamRelativeToPlusMultiplier: Double
@@ -18,33 +17,25 @@ struct DesktopSettingsUpdate: Equatable {
     var preferredCodexAppPath: String?
 }
 
-struct AutoRoutingPromptSettingsUpdate: Equatable {
-    var promptMode: CodexBarAutoRoutingPromptMode
-}
-
 struct SettingsSaveRequests: Equatable {
     var openAIAccount: OpenAIAccountSettingsUpdate?
     var openAIUsage: OpenAIUsageSettingsUpdate?
     var desktop: DesktopSettingsUpdate?
-    var autoRoutingPrompt: AutoRoutingPromptSettingsUpdate?
 
     init(
         openAIAccount: OpenAIAccountSettingsUpdate? = nil,
         openAIUsage: OpenAIUsageSettingsUpdate? = nil,
-        desktop: DesktopSettingsUpdate? = nil,
-        autoRoutingPrompt: AutoRoutingPromptSettingsUpdate? = nil
+        desktop: DesktopSettingsUpdate? = nil
     ) {
         self.openAIAccount = openAIAccount
         self.openAIUsage = openAIUsage
         self.desktop = desktop
-        self.autoRoutingPrompt = autoRoutingPrompt
     }
 
     var isEmpty: Bool {
         self.openAIAccount == nil &&
         self.openAIUsage == nil &&
-        self.desktop == nil &&
-        self.autoRoutingPrompt == nil
+        self.desktop == nil
     }
 }
 
@@ -293,12 +284,6 @@ final class TokenStore: ObservableObject {
     func saveDesktopSettings(_ request: DesktopSettingsUpdate) throws {
         try self.saveSettings(
             SettingsSaveRequests(desktop: request)
-        )
-    }
-
-    func saveAutoRoutingPromptSettings(_ request: AutoRoutingPromptSettingsUpdate) throws {
-        try self.saveSettings(
-            SettingsSaveRequests(autoRoutingPrompt: request)
         )
     }
 

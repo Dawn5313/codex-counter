@@ -79,37 +79,6 @@ struct CodexBarDesktopSettings: Codable, Equatable {
     }
 }
 
-enum CodexBarAutoRoutingPromptMode: String, Codable, CaseIterable, Identifiable {
-    case launchNewInstance
-    case remindOnly
-    case disabled
-
-    var id: String { self.rawValue }
-
-    var title: String {
-        switch self {
-        case .launchNewInstance:
-            return L.autoRoutingPromptModeLaunchNewInstance
-        case .remindOnly:
-            return L.autoRoutingPromptModeRemindOnly
-        case .disabled:
-            return L.autoRoutingPromptModeDisabled
-        }
-    }
-
-    var detail: String {
-        switch self {
-        case .launchNewInstance:
-            return L.autoRoutingPromptModeLaunchNewInstanceHint
-        case .remindOnly:
-            return L.autoRoutingPromptModeRemindOnlyHint
-        case .disabled:
-            return L.autoRoutingPromptModeDisabledHint
-        }
-    }
-
-}
-
 enum CodexBarOpenAIManualActivationBehavior: String, Codable, CaseIterable, Identifiable {
     case updateConfigOnly
     case launchNewInstance
@@ -132,7 +101,6 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
     var cooldownSeconds: TimeInterval
     var manualOverrideGraceSeconds: TimeInterval
     var fullSweepIntervalSeconds: TimeInterval
-    var promptMode: CodexBarAutoRoutingPromptMode
     var pinnedAccountId: String?
     var excludedAccountIds: [String]
 
@@ -144,7 +112,6 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
         case cooldownSeconds
         case manualOverrideGraceSeconds
         case fullSweepIntervalSeconds
-        case promptMode
         case pinnedAccountId
         case excludedAccountIds
     }
@@ -157,7 +124,6 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
         cooldownSeconds: TimeInterval = 300,
         manualOverrideGraceSeconds: TimeInterval = 900,
         fullSweepIntervalSeconds: TimeInterval = 1_800,
-        promptMode: CodexBarAutoRoutingPromptMode = .launchNewInstance,
         pinnedAccountId: String? = nil,
         excludedAccountIds: [String] = []
     ) {
@@ -168,7 +134,6 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
         self.cooldownSeconds = cooldownSeconds
         self.manualOverrideGraceSeconds = manualOverrideGraceSeconds
         self.fullSweepIntervalSeconds = fullSweepIntervalSeconds
-        self.promptMode = promptMode
         self.pinnedAccountId = pinnedAccountId
         self.excludedAccountIds = excludedAccountIds
     }
@@ -182,7 +147,6 @@ struct CodexBarAutoRoutingSettings: Codable, Equatable {
         self.cooldownSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .cooldownSeconds) ?? 300
         self.manualOverrideGraceSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .manualOverrideGraceSeconds) ?? 900
         self.fullSweepIntervalSeconds = try container.decodeIfPresent(TimeInterval.self, forKey: .fullSweepIntervalSeconds) ?? 1_800
-        self.promptMode = try container.decodeIfPresent(CodexBarAutoRoutingPromptMode.self, forKey: .promptMode) ?? .launchNewInstance
         self.pinnedAccountId = try container.decodeIfPresent(String.self, forKey: .pinnedAccountId)
         self.excludedAccountIds = try container.decodeIfPresent([String].self, forKey: .excludedAccountIds) ?? []
     }
@@ -201,7 +165,7 @@ struct CodexBarOpenAISettings: Codable, Equatable {
             case teamRelativeToPlusMultiplier
         }
 
-        init(
+        nonisolated init(
             plusRelativeWeight: Double = 10,
             teamRelativeToPlusMultiplier: Double = 1.5
         ) {
@@ -223,11 +187,11 @@ struct CodexBarOpenAISettings: Codable, Equatable {
             )
         }
 
-        var teamAbsoluteWeight: Double {
+        nonisolated var teamAbsoluteWeight: Double {
             self.plusRelativeWeight * self.teamRelativeToPlusMultiplier
         }
 
-        private static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
+        nonisolated private static func clamped(_ value: Double, to range: ClosedRange<Double>) -> Double {
             min(max(value, range.lowerBound), range.upperBound)
         }
     }
@@ -235,7 +199,6 @@ struct CodexBarOpenAISettings: Codable, Equatable {
     var accountOrder: [String]
     var accountOrderingMode: CodexBarOpenAIAccountOrderingMode
     var manualActivationBehavior: CodexBarOpenAIManualActivationBehavior
-    var popupAlertThresholdPercent: Double
     var usageDisplayMode: CodexBarUsageDisplayMode
     var quotaSort: QuotaSortSettings
 
@@ -243,7 +206,6 @@ struct CodexBarOpenAISettings: Codable, Equatable {
         case accountOrder
         case accountOrderingMode
         case manualActivationBehavior
-        case popupAlertThresholdPercent
         case usageDisplayMode
         case quotaSort
     }
@@ -252,14 +214,12 @@ struct CodexBarOpenAISettings: Codable, Equatable {
         accountOrder: [String] = [],
         accountOrderingMode: CodexBarOpenAIAccountOrderingMode = .quotaSort,
         manualActivationBehavior: CodexBarOpenAIManualActivationBehavior = .updateConfigOnly,
-        popupAlertThresholdPercent: Double = 20,
         usageDisplayMode: CodexBarUsageDisplayMode = .used,
         quotaSort: QuotaSortSettings = QuotaSortSettings()
     ) {
         self.accountOrder = accountOrder
         self.accountOrderingMode = accountOrderingMode
         self.manualActivationBehavior = manualActivationBehavior
-        self.popupAlertThresholdPercent = popupAlertThresholdPercent
         self.usageDisplayMode = usageDisplayMode
         self.quotaSort = quotaSort
     }
@@ -275,7 +235,6 @@ struct CodexBarOpenAISettings: Codable, Equatable {
             CodexBarOpenAIManualActivationBehavior.self,
             forKey: .manualActivationBehavior
         ) ?? .updateConfigOnly
-        self.popupAlertThresholdPercent = try container.decodeIfPresent(Double.self, forKey: .popupAlertThresholdPercent) ?? 20
         self.usageDisplayMode = try container.decodeIfPresent(CodexBarUsageDisplayMode.self, forKey: .usageDisplayMode) ?? .used
         self.quotaSort = try container.decodeIfPresent(QuotaSortSettings.self, forKey: .quotaSort) ?? QuotaSortSettings()
     }

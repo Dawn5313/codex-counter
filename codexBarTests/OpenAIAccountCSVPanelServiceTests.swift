@@ -3,22 +3,22 @@ import XCTest
 
 @MainActor
 final class OpenAIAccountCSVPanelServiceTests: XCTestCase {
-    func testExportCancelAtRiskPromptDoesNotOpenSavePanel() {
+    func testExportRequestsSavePanelAfterActivation() {
         var didActivate = false
         var didRequestSavePanel = false
+        let expectedURL = URL(fileURLWithPath: "/tmp/export.csv")
         let service = OpenAIAccountCSVPanelService(
             activateApp: { didActivate = true },
-            confirmSensitiveExportAction: { false },
             requestExportURLAction: { _ in
                 didRequestSavePanel = true
-                return URL(fileURLWithPath: "/tmp/should-not-exist.csv")
+                return expectedURL
             },
             requestImportURLAction: { nil }
         )
 
-        XCTAssertNil(service.requestExportURL())
+        XCTAssertEqual(service.requestExportURL(), expectedURL)
         XCTAssertTrue(didActivate)
-        XCTAssertFalse(didRequestSavePanel)
+        XCTAssertTrue(didRequestSavePanel)
     }
 
     func testExportPassesSuggestedCSVFilenameToSavePanel() {
@@ -26,7 +26,6 @@ final class OpenAIAccountCSVPanelServiceTests: XCTestCase {
         let expectedURL = URL(fileURLWithPath: "/tmp/export.csv")
         let service = OpenAIAccountCSVPanelService(
             activateApp: {},
-            confirmSensitiveExportAction: { true },
             requestExportURLAction: { suggestedFilename in
                 receivedFilename = suggestedFilename
                 return expectedURL
@@ -43,7 +42,6 @@ final class OpenAIAccountCSVPanelServiceTests: XCTestCase {
         var didActivate = false
         let service = OpenAIAccountCSVPanelService(
             activateApp: { didActivate = true },
-            confirmSensitiveExportAction: { true },
             requestExportURLAction: { _ in nil },
             requestImportURLAction: { nil }
         )

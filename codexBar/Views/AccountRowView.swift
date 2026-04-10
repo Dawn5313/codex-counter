@@ -5,7 +5,6 @@ struct AccountRowView: View {
     let account: TokenAccount
     let rowState: OpenAIAccountRowState
     let isRefreshing: Bool
-    let popupAlertThresholdPercent: Double
     let usageDisplayMode: CodexBarUsageDisplayMode
     let defaultManualActivationBehavior: CodexBarOpenAIManualActivationBehavior?
     let onActivate: (OpenAIManualActivationTrigger) -> Void
@@ -47,17 +46,7 @@ struct AccountRowView: View {
 
             Spacer(minLength: 6)
 
-            // 删除按钮（NSAlert 二次确认）
-            Button {
-                let alert = NSAlert()
-                alert.messageText = L.confirmDelete(deletePromptName)
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: L.delete)
-                alert.addButton(withTitle: L.cancel)
-                if alert.runModal() == .alertFirstButtonReturn {
-                    onDelete()
-                }
-            } label: {
+            Button(action: onDelete) {
                 Image(systemName: "trash")
                     .font(.system(size: 10))
             }
@@ -157,16 +146,10 @@ struct AccountRowView: View {
         }
     }
 
-    private var deletePromptName: String {
-        if let org = account.organizationName, !org.isEmpty { return org }
-        if !account.email.isEmpty { return account.email }
-        return "OpenAI account"
-    }
-
     private var statusColor: Color {
         if account.isBanned { return .red }
         if account.quotaExhausted { return .orange }
-        if account.isBelowPopupAlertThreshold(self.popupAlertThresholdPercent) { return .yellow }
+        if account.isBelowVisualWarningThreshold() { return .yellow }
         return .green
     }
 
@@ -174,7 +157,7 @@ struct AccountRowView: View {
         if self.rowState.isNextUseTarget { return Color.accentColor.opacity(0.14) }
         if account.isBanned { return Color.red.opacity(0.045) }
         if account.quotaExhausted { return Color.orange.opacity(0.05) }
-        if account.isBelowPopupAlertThreshold(self.popupAlertThresholdPercent) {
+        if account.isBelowVisualWarningThreshold() {
             return Color.yellow.opacity(0.05)
         }
         return Color.secondary.opacity(0.055)
@@ -184,7 +167,7 @@ struct AccountRowView: View {
         if self.rowState.isNextUseTarget { return Color.accentColor.opacity(0.28) }
         if account.isBanned { return Color.red.opacity(0.12) }
         if account.quotaExhausted { return Color.orange.opacity(0.14) }
-        if account.isBelowPopupAlertThreshold(self.popupAlertThresholdPercent) {
+        if account.isBelowVisualWarningThreshold() {
             return Color.yellow.opacity(0.14)
         }
         return Color.primary.opacity(0.08)
@@ -200,7 +183,7 @@ struct AccountRowView: View {
 
     private func usageColor(_ window: UsageWindowDisplay) -> Color {
         if window.usedPercent >= 100 { return .red }
-        if self.popupAlertThresholdPercent > 0 && window.remainingPercent <= self.popupAlertThresholdPercent {
+        if window.remainingPercent <= OpenAIVisualWarningThreshold.remainingPercent {
             return .orange
         }
 

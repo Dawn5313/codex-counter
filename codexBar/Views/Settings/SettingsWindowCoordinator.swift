@@ -15,7 +15,6 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case accounts
     case usage
     case codexAppPath
-    case recommendationPrompt
     case updates
 
     var id: String { self.rawValue }
@@ -25,12 +24,10 @@ struct SettingsWindowDraft: Equatable {
     var accountOrder: [String]
     var accountOrderingMode: CodexBarOpenAIAccountOrderingMode
     var manualActivationBehavior: CodexBarOpenAIManualActivationBehavior
-    var popupAlertThresholdPercent: Double
     var usageDisplayMode: CodexBarUsageDisplayMode
     var plusRelativeWeight: Double
     var teamRelativeToPlusMultiplier: Double
     var preferredCodexAppPath: String?
-    var autoRoutingPromptMode: CodexBarAutoRoutingPromptMode
 
     init(config: CodexBarConfig, accounts: [TokenAccount]) {
         self.accountOrder = Self.normalizedAccountOrder(
@@ -39,12 +36,10 @@ struct SettingsWindowDraft: Equatable {
         )
         self.accountOrderingMode = config.openAI.accountOrderingMode
         self.manualActivationBehavior = config.openAI.manualActivationBehavior
-        self.popupAlertThresholdPercent = config.openAI.popupAlertThresholdPercent
         self.usageDisplayMode = config.openAI.usageDisplayMode
         self.plusRelativeWeight = config.openAI.quotaSort.plusRelativeWeight
         self.teamRelativeToPlusMultiplier = config.openAI.quotaSort.teamRelativeToPlusMultiplier
         self.preferredCodexAppPath = config.desktop.preferredCodexAppPath
-        self.autoRoutingPromptMode = config.autoRouting.promptMode
     }
 
     static func mergedAccountOrder(
@@ -86,12 +81,10 @@ enum SettingsDirtyField: Hashable {
     case accountOrder
     case accountOrderingMode
     case manualActivationBehavior
-    case popupAlertThresholdPercent
     case usageDisplayMode
     case plusRelativeWeight
     case teamRelativeToPlusMultiplier
     case preferredCodexAppPath
-    case autoRoutingPromptMode
 }
 
 @MainActor
@@ -209,12 +202,10 @@ final class SettingsWindowCoordinator: ObservableObject {
 
         self.reconcile(\.accountOrderingMode, externalValue: externalDraft.accountOrderingMode, field: .accountOrderingMode)
         self.reconcile(\.manualActivationBehavior, externalValue: externalDraft.manualActivationBehavior, field: .manualActivationBehavior)
-        self.reconcile(\.popupAlertThresholdPercent, externalValue: externalDraft.popupAlertThresholdPercent, field: .popupAlertThresholdPercent)
         self.reconcile(\.usageDisplayMode, externalValue: externalDraft.usageDisplayMode, field: .usageDisplayMode)
         self.reconcile(\.plusRelativeWeight, externalValue: externalDraft.plusRelativeWeight, field: .plusRelativeWeight)
         self.reconcile(\.teamRelativeToPlusMultiplier, externalValue: externalDraft.teamRelativeToPlusMultiplier, field: .teamRelativeToPlusMultiplier)
         self.reconcile(\.preferredCodexAppPath, externalValue: externalDraft.preferredCodexAppPath, field: .preferredCodexAppPath)
-        self.reconcile(\.autoRoutingPromptMode, externalValue: externalDraft.autoRoutingPromptMode, field: .autoRoutingPromptMode)
     }
 
     func makeSaveRequests() -> SettingsSaveRequests {
@@ -230,12 +221,10 @@ final class SettingsWindowCoordinator: ObservableObject {
             )
         }
 
-        if self.draft.popupAlertThresholdPercent != self.baseline.popupAlertThresholdPercent ||
-            self.draft.usageDisplayMode != self.baseline.usageDisplayMode ||
+        if self.draft.usageDisplayMode != self.baseline.usageDisplayMode ||
             self.draft.plusRelativeWeight != self.baseline.plusRelativeWeight ||
             self.draft.teamRelativeToPlusMultiplier != self.baseline.teamRelativeToPlusMultiplier {
             requests.openAIUsage = OpenAIUsageSettingsUpdate(
-                popupAlertThresholdPercent: self.draft.popupAlertThresholdPercent,
                 usageDisplayMode: self.draft.usageDisplayMode,
                 plusRelativeWeight: self.draft.plusRelativeWeight,
                 teamRelativeToPlusMultiplier: self.draft.teamRelativeToPlusMultiplier
@@ -245,12 +234,6 @@ final class SettingsWindowCoordinator: ObservableObject {
         if self.draft.preferredCodexAppPath != self.baseline.preferredCodexAppPath {
             requests.desktop = DesktopSettingsUpdate(
                 preferredCodexAppPath: self.draft.preferredCodexAppPath
-            )
-        }
-
-        if self.draft.autoRoutingPromptMode != self.baseline.autoRoutingPromptMode {
-            requests.autoRoutingPrompt = AutoRoutingPromptSettingsUpdate(
-                promptMode: self.draft.autoRoutingPromptMode
             )
         }
 

@@ -78,14 +78,7 @@ struct CompatibleProviderRowView: View {
                     }
 
                     Button {
-                        let alert = NSAlert()
-                        alert.messageText = "Delete \(account.label)?"
-                        alert.alertStyle = .warning
-                        alert.addButton(withTitle: "Delete")
-                        alert.addButton(withTitle: "Cancel")
-                        if alert.runModal() == .alertFirstButtonReturn {
-                            onDeleteAccount(account)
-                        }
+                        onDeleteAccount(account)
                     } label: {
                         Image(systemName: "trash")
                             .font(.system(size: 10))
@@ -104,4 +97,3 @@ struct CompatibleProviderRowView: View {
         )
     }
 }
-

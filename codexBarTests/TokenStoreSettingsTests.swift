@@ -36,14 +36,12 @@ final class TokenStoreSettingsTests: CodexBarTestCase {
 
         try store.saveOpenAIUsageSettings(
             OpenAIUsageSettingsUpdate(
-                popupAlertThresholdPercent: 35,
                 usageDisplayMode: .remaining,
                 plusRelativeWeight: 6,
                 teamRelativeToPlusMultiplier: 2
             )
         )
 
-        XCTAssertEqual(store.config.openAI.popupAlertThresholdPercent, 35)
         XCTAssertEqual(store.config.openAI.usageDisplayMode, .remaining)
         XCTAssertEqual(store.config.openAI.quotaSort.plusRelativeWeight, 6)
         XCTAssertEqual(store.config.openAI.quotaSort.teamRelativeToPlusMultiplier, 2)
@@ -71,28 +69,7 @@ final class TokenStoreSettingsTests: CodexBarTestCase {
         XCTAssertEqual(store.config.desktop.preferredCodexAppPath, validAppURL.path)
         XCTAssertEqual(store.config.openAI.accountOrderingMode, .quotaSort)
         XCTAssertEqual(store.config.openAI.manualActivationBehavior, .launchNewInstance)
-        XCTAssertEqual(store.config.autoRouting.promptMode, .launchNewInstance)
-    }
-
-    func testSaveAutoRoutingPromptSettingsOnlyTouchesPromptMode() throws {
-        let store = TokenStore.shared
-        store.load()
-        try store.saveOpenAIAccountSettings(
-            OpenAIAccountSettingsUpdate(
-                accountOrder: [],
-                accountOrderingMode: .quotaSort,
-                manualActivationBehavior: .launchNewInstance
-            )
-        )
-
-        try store.saveAutoRoutingPromptSettings(
-            AutoRoutingPromptSettingsUpdate(promptMode: .remindOnly)
-        )
-
-        XCTAssertEqual(store.config.autoRouting.promptMode, .remindOnly)
-        XCTAssertEqual(store.config.openAI.accountOrderingMode, .quotaSort)
-        XCTAssertEqual(store.config.openAI.manualActivationBehavior, .launchNewInstance)
-        XCTAssertEqual(store.config.openAI.accountOrder, [])
+        XCTAssertFalse(store.config.autoRouting.enabled)
     }
 
     private func makeValidCodexApp(named relativePath: String) throws -> URL {

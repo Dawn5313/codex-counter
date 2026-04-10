@@ -36,8 +36,8 @@ final class MenuBarIconResolverTests: XCTestCase {
         XCTAssertEqual(icon, "exclamationmark.triangle.fill")
     }
 
-    func testPopupAlertThresholdControlsBoltWarningIcon() {
-        let accounts = [
+    func testVisualWarningThresholdControlsBoltWarningIcon() {
+        let warningAccounts = [
             TokenAccount(
                 email: "alice@example.com",
                 accountId: "acct_alice",
@@ -46,19 +46,26 @@ final class MenuBarIconResolverTests: XCTestCase {
                 isActive: true
             )
         ]
+        let healthyAccounts = [
+            TokenAccount(
+                email: "bob@example.com",
+                accountId: "acct_bob",
+                primaryUsedPercent: 75,
+                secondaryUsedPercent: 10,
+                isActive: true
+            )
+        ]
 
-        let relaxed = MenuBarIconResolver.iconName(
-            accounts: accounts,
-            activeProviderKind: .openAIOAuth,
-            popupAlertThresholdPercent: 10
+        let warning = MenuBarIconResolver.iconName(
+            accounts: warningAccounts,
+            activeProviderKind: .openAIOAuth
         )
-        let strict = MenuBarIconResolver.iconName(
-            accounts: accounts,
-            activeProviderKind: .openAIOAuth,
-            popupAlertThresholdPercent: 20
+        let healthy = MenuBarIconResolver.iconName(
+            accounts: healthyAccounts,
+            activeProviderKind: .openAIOAuth
         )
 
-        XCTAssertEqual(relaxed, "terminal.fill")
-        XCTAssertEqual(strict, "bolt.circle.fill")
+        XCTAssertEqual(warning, "bolt.circle.fill")
+        XCTAssertEqual(healthy, "terminal.fill")
     }
 }

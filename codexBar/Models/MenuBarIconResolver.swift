@@ -3,14 +3,12 @@ import Foundation
 enum MenuBarIconResolver {
     static func iconName(
         accounts: [TokenAccount],
-        activeProviderKind: CodexBarProviderKind?,
-        popupAlertThresholdPercent: Double = 20
+        activeProviderKind: CodexBarProviderKind?
     ) -> String {
         if let active = accounts.first(where: { $0.isActive }) {
             return self.iconName(
                 for: [active],
-                fallbackProviderKind: activeProviderKind,
-                popupAlertThresholdPercent: popupAlertThresholdPercent
+                fallbackProviderKind: activeProviderKind
             )
         }
 
@@ -20,15 +18,13 @@ enum MenuBarIconResolver {
 
         return self.iconName(
             for: accounts,
-            fallbackProviderKind: activeProviderKind,
-            popupAlertThresholdPercent: popupAlertThresholdPercent
+            fallbackProviderKind: activeProviderKind
         )
     }
 
     private static func iconName(
         for accounts: [TokenAccount],
-        fallbackProviderKind: CodexBarProviderKind?,
-        popupAlertThresholdPercent: Double
+        fallbackProviderKind: CodexBarProviderKind?
     ) -> String {
         if accounts.contains(where: { $0.isBanned }) {
             return "xmark.circle.fill"
@@ -36,7 +32,7 @@ enum MenuBarIconResolver {
         if accounts.contains(where: { $0.secondaryExhausted }) {
             return "exclamationmark.triangle.fill"
         }
-        if accounts.contains(where: { $0.quotaExhausted || $0.isBelowPopupAlertThreshold(popupAlertThresholdPercent) }) {
+        if accounts.contains(where: { $0.quotaExhausted || $0.isBelowVisualWarningThreshold() }) {
             return "bolt.circle.fill"
         }
         if fallbackProviderKind == .openAICompatible {

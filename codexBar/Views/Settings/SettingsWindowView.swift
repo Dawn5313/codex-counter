@@ -9,14 +9,15 @@ struct SettingsWindowView: View {
 
     @StateObject private var coordinator: SettingsWindowCoordinator
 
+    @MainActor
     init(
         store: TokenStore,
-        updateCoordinator: UpdateCoordinator = .shared,
+        updateCoordinator: UpdateCoordinator? = nil,
         codexAppPathPanelService: CodexAppPathPanelService,
         onClose: @escaping () -> Void
     ) {
         self._store = ObservedObject(wrappedValue: store)
-        self._updateCoordinator = ObservedObject(wrappedValue: updateCoordinator)
+        self._updateCoordinator = ObservedObject(wrappedValue: updateCoordinator ?? .shared)
         self.codexAppPathPanelService = codexAppPathPanelService
         self.onClose = onClose
         self._coordinator = StateObject(
@@ -139,13 +140,6 @@ struct SettingsWindowView: View {
                         validationMessage: self.$coordinator.validationMessage,
                         codexAppPathPanelService: self.codexAppPathPanelService
                     )
-                case .recommendationPrompt:
-                    SettingsRecommendationPromptPage(
-                        autoRoutingPromptMode: self.binding(
-                            \.autoRoutingPromptMode,
-                            field: .autoRoutingPromptMode
-                        )
-                    )
                 case .updates:
                     SettingsUpdatesPage(updateCoordinator: self.updateCoordinator)
                 }
@@ -201,13 +195,6 @@ private struct SettingsUsagePage: View {
                 )
             )
 
-            SettingsPopupAlertThresholdSection(
-                popupAlertThresholdPercent: Binding(
-                    get: { self.coordinator.draft.popupAlertThresholdPercent },
-                    set: { self.coordinator.update(\.popupAlertThresholdPercent, to: $0, field: .popupAlertThresholdPercent) }
-                )
-            )
-
             SettingsQuotaSortSection(
                 plusRelativeWeight: Binding(
                     get: { self.coordinator.draft.plusRelativeWeight },
@@ -237,21 +224,6 @@ private struct SettingsCodexAppPathPage: View {
                 preferredCodexAppPath: self.$preferredCodexAppPath,
                 validationMessage: self.$validationMessage,
                 codexAppPathPanelService: self.codexAppPathPanelService
-            )
-        }
-    }
-}
-
-private struct SettingsRecommendationPromptPage: View {
-    @Binding var autoRoutingPromptMode: CodexBarAutoRoutingPromptMode
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(SettingsPage.recommendationPrompt.title)
-                .font(.system(size: 16, weight: .semibold))
-
-            SettingsAutoRoutingPromptModeSection(
-                promptMode: self.$autoRoutingPromptMode
             )
         }
     }
@@ -622,55 +594,6 @@ private struct SettingsCodexAppPathSection: View {
     }
 }
 
-private struct SettingsAutoRoutingPromptModeSection: View {
-    @Binding var promptMode: CodexBarAutoRoutingPromptMode
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L.autoRoutingPromptModeTitle)
-                .font(.system(size: 12, weight: .medium))
-
-            Text(L.autoRoutingPromptModeHint)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(CodexBarAutoRoutingPromptMode.allCases) { mode in
-                    Button {
-                        self.promptMode = mode
-                    } label: {
-                        HStack(alignment: .top, spacing: 10) {
-                            Image(systemName: self.promptMode == mode ? "largecircle.fill.circle" : "circle")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(self.promptMode == mode ? .accentColor : .secondary)
-                                .padding(.top, 2)
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(mode.title)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundColor(.primary)
-                                Text(mode.detail)
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(self.promptMode == mode ? Color.accentColor.opacity(0.08) : Color.secondary.opacity(0.06))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-}
-
 private struct SettingsUsageDisplayModeSection: View {
     @Binding var usageDisplayMode: CodexBarUsageDisplayMode
 
@@ -686,41 +609,6 @@ private struct SettingsUsageDisplayModeSection: View {
             }
             .pickerStyle(.segmented)
         }
-    }
-}
-
-private struct SettingsPopupAlertThresholdSection: View {
-    @Binding var popupAlertThresholdPercent: Double
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(L.popupAlertThresholdTitle)
-                    .font(.system(size: 12, weight: .medium))
-                Spacer()
-                Text(self.summary)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .monospacedDigit()
-            }
-
-            Slider(
-                value: self.$popupAlertThresholdPercent,
-                in: 0...100,
-                step: 5
-            )
-
-            Text(L.popupAlertThresholdHint)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
-        }
-    }
-
-    private var summary: String {
-        if self.popupAlertThresholdPercent <= 0 {
-            return L.popupAlertDisabled
-        }
-        return L.popupAlertThresholdValue(Int(self.popupAlertThresholdPercent))
     }
 }
 
@@ -794,8 +682,6 @@ private extension SettingsPage {
             return L.settingsUsagePageTitle
         case .codexAppPath:
             return L.settingsCodexAppPathPageTitle
-        case .recommendationPrompt:
-            return L.settingsRecommendationPageTitle
         case .updates:
             return L.settingsUpdatesPageTitle
         }
@@ -809,8 +695,6 @@ private extension SettingsPage {
             return "chart.bar"
         case .codexAppPath:
             return "app.badge"
-        case .recommendationPrompt:
-            return "bell.badge"
         case .updates:
             return "arrow.trianglehead.2.clockwise"
         }

@@ -3,10 +3,8 @@ import XCTest
 
 @MainActor
 final class UpdateCoordinatorTests: XCTestCase {
-    func testManualCheckPromptsAvailableUpdateAndSkipsExecutionWhenCancelled() async {
+    func testManualCheckStoresAvailableUpdateWithoutExecuting() async {
         let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
-        let presenter = MockUpdatePresenter()
-        presenter.nextChoice = .cancel
         let executor = MockUpdateExecutor()
 
         let coordinator = UpdateCoordinator(
@@ -18,14 +16,12 @@ final class UpdateCoordinatorTests: XCTestCase {
             capabilityEvaluator: MockCapabilityEvaluator(
                 blockers: [.feedRequiresGuidedDownload]
             ),
-            presenter: presenter,
             actionExecutor: executor
         )
 
         await coordinator.checkForUpdates(trigger: .manual)
 
         XCTAssertEqual(feedLoader.loadCount, 1)
-        XCTAssertEqual(presenter.promptedTriggers, [.manual])
         XCTAssertTrue(executor.executed.isEmpty)
         XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
 
@@ -35,9 +31,8 @@ final class UpdateCoordinatorTests: XCTestCase {
         XCTAssertEqual(availability.release.version, "1.1.6")
     }
 
-    func testToolbarActionReusesPendingUpdateWithoutRefetching() async {
+    func testToolbarActionExecutesPendingUpdateWithoutRefetching() async {
         let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
-        let presenter = MockUpdatePresenter()
         let executor = MockUpdateExecutor()
 
         let coordinator = UpdateCoordinator(
@@ -49,27 +44,22 @@ final class UpdateCoordinatorTests: XCTestCase {
             capabilityEvaluator: MockCapabilityEvaluator(
                 blockers: [.feedRequiresGuidedDownload]
             ),
-            presenter: presenter,
             actionExecutor: executor
         )
 
-        presenter.nextChoice = .cancel
-        await coordinator.checkForUpdates(trigger: .automaticStartup)
+        await coordinator.checkForUpdates(trigger: .manual)
         feedLoader.feed = self.makeFeed(version: "1.1.5")
-        presenter.nextChoice = .install
 
         await coordinator.handleToolbarAction()
 
-        XCTAssertEqual(feedLoader.loadCount, 2)
-        XCTAssertEqual(presenter.promptedTriggers, [.automaticStartup])
-        XCTAssertEqual(executor.executed.count, 0)
-        XCTAssertEqual(presenter.upToDateMessages.count, 1)
-        XCTAssertNil(coordinator.pendingAvailability)
+        XCTAssertEqual(feedLoader.loadCount, 1)
+        XCTAssertEqual(executor.executed.count, 1)
+        XCTAssertEqual(executor.executed.first?.release.version, "1.1.6")
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
     }
 
     func testAutomaticAndManualChecksUseSameFeedResolution() async {
         let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
-        let presenter = MockUpdatePresenter()
 
         let coordinator = UpdateCoordinator(
             feedLoader: feedLoader,
@@ -80,22 +70,18 @@ final class UpdateCoordinatorTests: XCTestCase {
             capabilityEvaluator: MockCapabilityEvaluator(
                 blockers: [.feedRequiresGuidedDownload]
             ),
-            presenter: presenter,
             actionExecutor: MockUpdateExecutor()
         )
 
-        presenter.nextChoice = .cancel
         await coordinator.checkForUpdates(trigger: .automaticStartup)
         await coordinator.checkForUpdates(trigger: .manual)
 
         XCTAssertEqual(feedLoader.loadCount, 2)
-        XCTAssertEqual(presenter.promptedTriggers, [.automaticStartup, .manual])
-        XCTAssertEqual(presenter.promptedVersions, ["1.1.6", "1.1.6"])
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
         XCTAssertEqual(coordinator.pendingAvailability?.selectedArtifact.architecture, .x86_64)
     }
 
-    func testManualCheckShowsUpToDateMessageWhenVersionsMatch() async {
-        let presenter = MockUpdatePresenter()
+    func testManualCheckShowsUpToDateStateWhenVersionsMatch() async {
         let coordinator = UpdateCoordinator(
             feedLoader: MockFeedLoader(feed: self.makeFeed(version: "1.1.5")),
             environment: MockUpdateEnvironment(
@@ -103,15 +89,11 @@ final class UpdateCoordinatorTests: XCTestCase {
                 architecture: .arm64
             ),
             capabilityEvaluator: MockCapabilityEvaluator(blockers: []),
-            presenter: presenter,
             actionExecutor: MockUpdateExecutor()
         )
 
         await coordinator.checkForUpdates(trigger: .manual)
 
-        XCTAssertEqual(presenter.upToDateMessages.count, 1)
-        XCTAssertEqual(presenter.upToDateMessages.first?.0, "1.1.5")
-        XCTAssertEqual(presenter.upToDateMessages.first?.1, "1.1.5")
         XCTAssertNil(coordinator.pendingAvailability)
         guard case let .upToDate(currentVersion, checkedVersion) = coordinator.state else {
             return XCTFail("Expected upToDate state")
@@ -121,7 +103,6 @@ final class UpdateCoordinatorTests: XCTestCase {
     }
 
     func testCoordinatorFailsWhenCompatibleArtifactIsMissing() async {
-        let presenter = MockUpdatePresenter()
         let feed = self.makeFeed(
             version: "1.1.6",
             artifacts: [
@@ -141,16 +122,11 @@ final class UpdateCoordinatorTests: XCTestCase {
                 architecture: .arm64
             ),
             capabilityEvaluator: MockCapabilityEvaluator(blockers: []),
-            presenter: presenter,
             actionExecutor: MockUpdateExecutor()
         )
 
         await coordinator.checkForUpdates(trigger: .manual)
 
-        XCTAssertEqual(
-            presenter.failures,
-            [L.updateErrorNoCompatibleArtifact("Apple Silicon")]
-        )
         guard case let .failed(message) = coordinator.state else {
             return XCTFail("Expected failed state")
         }
@@ -353,42 +329,6 @@ private struct MockCapabilityEvaluator: AppUpdateCapabilityEvaluating {
         environment: AppUpdateEnvironmentProviding
     ) -> [AppUpdateBlocker] {
         self.blockers
-    }
-}
-
-private final class MockUpdatePresenter: AppUpdatePresenting {
-    var nextChoice: AppUpdatePromptChoice = .cancel
-    var promptedTriggers: [UpdateCheckTrigger] = []
-    var promptedVersions: [String] = []
-    var upToDateMessages: [(String, String)] = []
-    var failures: [String] = []
-    var guidedDownloadPresentedVersions: [String] = []
-
-    func promptForAvailableUpdate(
-        _ availability: AppUpdateAvailability,
-        trigger: UpdateCheckTrigger
-    ) -> AppUpdatePromptChoice {
-        self.promptedTriggers.append(trigger)
-        self.promptedVersions.append(availability.release.version)
-        return self.nextChoice
-    }
-
-    func showUpToDate(
-        currentVersion: String,
-        checkedVersion: String
-    ) {
-        self.upToDateMessages.append((currentVersion, checkedVersion))
-    }
-
-    func showFailure(
-        _ message: String,
-        trigger: UpdateCheckTrigger
-    ) {
-        self.failures.append(message)
-    }
-
-    func showGuidedDownloadStarted(_ availability: AppUpdateAvailability) {
-        self.guidedDownloadPresentedVersions.append(availability.release.version)
     }
 }
 

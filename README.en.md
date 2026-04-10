@@ -73,7 +73,7 @@ This repository now ships a single update feed. The app performs a non-blocking 
 The current boundary is intentionally narrow:
 
 - the stable feed is still in **guided download / install** mode
-- when a newer version exists, codexbar prompts you and opens the matching Apple Silicon / Intel installer asset
+- when a newer version exists, codexbar shows it in the menu/status UI so you can continue with the matching Apple Silicon / Intel installer asset
 - the current build does **not** pretend that automatic app replacement and restart are already available
 - `1.1.5 -> the first updater-capable version` still requires a manual bootstrap install
 - the real automatic-update loop should only be validated from `the first updater-capable version -> the next version`

@@ -1,5 +1,9 @@
 import Foundation
 
+enum OpenAIVisualWarningThreshold {
+    static let remainingPercent = 20.0
+}
+
 struct TokenAccount: Codable, Identifiable {
     private static let degradedRoutingThresholdPercent = 80.0
     private static let exhaustedRoutingThresholdPercent = 100.0
@@ -292,11 +296,10 @@ extension TokenAccount {
         }
     }
 
-    nonisolated func isBelowPopupAlertThreshold(_ thresholdPercent: Double) -> Bool {
-        guard thresholdPercent > 0 else { return false }
+    nonisolated func isBelowVisualWarningThreshold() -> Bool {
         guard self.isBanned == false, self.tokenExpired == false else { return false }
         return self.rateLimitWindows(now: Date()).contains {
-            max(0, 100 - $0.usedPercent) <= thresholdPercent
+            max(0, 100 - $0.usedPercent) <= OpenAIVisualWarningThreshold.remainingPercent
         }
     }
 

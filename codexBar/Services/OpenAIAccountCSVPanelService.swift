@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import UniformTypeIdentifiers
 
 enum OpenAIAccountCSVToolbarUI {
     static let symbolName = "arrow.up.arrow.down.circle"
@@ -8,31 +9,28 @@ enum OpenAIAccountCSVToolbarUI {
 
 @MainActor
 struct OpenAIAccountCSVPanelService {
-    typealias AppActivator = () -> Void
-    typealias ExportRiskConfirmation = () -> Bool
-    typealias ExportURLRequester = (_ suggestedFilename: String) -> URL?
-    typealias ImportURLRequester = () -> URL?
+    typealias AppActivator = @MainActor () -> Void
+    typealias ExportURLRequester = @MainActor (_ suggestedFilename: String) -> URL?
+    typealias ImportURLRequester = @MainActor () -> URL?
 
     private let activateApp: AppActivator
-    private let confirmSensitiveExportAction: ExportRiskConfirmation
     private let requestExportURLAction: ExportURLRequester
     private let requestImportURLAction: ImportURLRequester
 
     init(
-        activateApp: @escaping AppActivator = OpenAIAccountCSVPanelService.activateApp,
-        confirmSensitiveExportAction: @escaping ExportRiskConfirmation = OpenAIAccountCSVPanelService.confirmSensitiveExport,
-        requestExportURLAction: @escaping ExportURLRequester = OpenAIAccountCSVPanelService.presentExportPanel(suggestedFilename:),
-        requestImportURLAction: @escaping ImportURLRequester = OpenAIAccountCSVPanelService.presentImportPanel
+        activateApp: @escaping AppActivator = { OpenAIAccountCSVPanelService.activateApp() },
+        requestExportURLAction: @escaping ExportURLRequester = { suggestedFilename in
+            OpenAIAccountCSVPanelService.presentExportPanel(suggestedFilename: suggestedFilename)
+        },
+        requestImportURLAction: @escaping ImportURLRequester = { OpenAIAccountCSVPanelService.presentImportPanel() }
     ) {
         self.activateApp = activateApp
-        self.confirmSensitiveExportAction = confirmSensitiveExportAction
         self.requestExportURLAction = requestExportURLAction
         self.requestImportURLAction = requestImportURLAction
     }
 
     func requestExportURL() -> URL? {
         self.activateApp()
-        guard self.confirmSensitiveExportAction() else { return nil }
         return self.requestExportURLAction(self.defaultExportFilename())
     }
 
@@ -51,23 +49,13 @@ struct OpenAIAccountCSVPanelService {
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    private static func confirmSensitiveExport() -> Bool {
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = L.openAICSVRiskTitle
-        alert.informativeText = L.openAICSVRiskMessage
-        alert.addButton(withTitle: L.openAICSVRiskConfirm)
-        alert.addButton(withTitle: L.cancel)
-        return alert.runModal() == .alertFirstButtonReturn
-    }
-
     private static func presentExportPanel(suggestedFilename: String) -> URL? {
         let panel = NSSavePanel()
         panel.title = L.exportOpenAICSVAction
         panel.prompt = L.openAICSVExportPrompt
         panel.canCreateDirectories = true
         panel.allowsOtherFileTypes = false
-        panel.allowedFileTypes = ["csv"]
+        panel.allowedContentTypes = [.commaSeparatedText]
         panel.nameFieldStringValue = suggestedFilename
         return panel.runModal() == .OK ? panel.url : nil
     }
@@ -80,7 +68,7 @@ struct OpenAIAccountCSVPanelService {
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
         panel.allowsOtherFileTypes = false
-        panel.allowedFileTypes = ["csv"]
+        panel.allowedContentTypes = [.commaSeparatedText]
         return panel.runModal() == .OK ? panel.url : nil
     }
 }

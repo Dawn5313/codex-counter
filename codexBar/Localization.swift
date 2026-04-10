@@ -53,41 +53,6 @@ enum L {
     static var exportOpenAICSVAction: String { zh ? "导出 OpenAI CSV…" : "Export OpenAI CSV…" }
     static var importOpenAICSVAction: String { zh ? "导入 OpenAI CSV…" : "Import OpenAI CSV…" }
     static var settings: String { zh ? "设置" : "Settings" }
-    static var updateNow: String { zh ? "更新并重启" : "Update & Restart" }
-    static var downloadUpdate: String { zh ? "下载更新" : "Download Update" }
-    static var updateUpToDateTitle: String { zh ? "已是最新版本" : "You're Up to Date" }
-    static func updateUpToDateBody(_ currentVersion: String, _ checkedVersion: String) -> String {
-        zh
-            ? "当前版本 \(currentVersion) 已与 GitHub 上的最新稳定版本 \(checkedVersion) 一致。"
-            : "The current version \(currentVersion) already matches the latest stable version \(checkedVersion) on GitHub."
-    }
-    static func updateAvailableTitle(_ version: String) -> String {
-        zh ? "发现新版本 \(version)" : "Update \(version) Available"
-    }
-    static func updatePromptVersionLine(_ currentVersion: String, _ newVersion: String) -> String {
-        zh
-            ? "当前版本：\(currentVersion)\n最新版本：\(newVersion)"
-            : "Current version: \(currentVersion)\nLatest version: \(newVersion)"
-    }
-    static var updateAutomaticPromptBody: String {
-        zh
-            ? "当前安装满足自动更新前置条件。确认后将进入标准更新执行链，下载、替换并重启应用。"
-            : "This installation satisfies the automatic update prerequisites. Confirm to start the standard download, replace, and restart flow."
-    }
-    static func updateGuidedPromptBody(_ architecture: String, _ format: String) -> String {
-        zh
-            ? "当前版本仍处于受控降级模式。确认后将打开匹配 \(architecture) 的 \(format) 安装包链接，并由你手动完成替换安装。"
-            : "This build is still in guided-install mode. Confirm to open the matching \(architecture) \(format) installer and complete the replacement manually."
-    }
-    static var updateGuidedDownloadStartedTitle: String {
-        zh ? "已打开更新下载" : "Update Download Opened"
-    }
-    static func updateGuidedDownloadStartedBody(_ version: String, _ architecture: String, _ format: String) -> String {
-        zh
-            ? "已为 \(architecture) 打开 \(format) 安装包下载链接（版本 \(version)）。安装完成后请手动替换旧的 codexbar.app，并重新启动。"
-            : "Opened the \(format) installer for \(architecture) (version \(version)). Replace the existing codexbar.app manually after the download finishes, then relaunch it."
-    }
-    static var updateFailedTitle: String { zh ? "更新失败" : "Update Failed" }
     static func updateInstallActionHelp(_ version: String) -> String {
         zh ? "下载或安装 \(version)" : "Download or Install \(version)"
     }
@@ -153,13 +118,12 @@ enum L {
     static var settingsWindowTitle: String { self.settings }
     static var settingsWindowHint: String {
         zh
-            ? "左侧切换账户、用量、Codex App 路径、弹窗推荐和更新设置。窗口内的修改会先保存在草稿里，点击保存后再统一生效。"
-            : "Use the sidebar to switch between account, usage, Codex App path, recommendation prompt, and update settings. Changes stay in a window draft until you save."
+            ? "左侧切换账户、用量、Codex App 路径和更新设置。窗口内的修改会先保存在草稿里，点击保存后再统一生效。"
+            : "Use the sidebar to switch between account, usage, Codex App path, and update settings. Changes stay in a window draft until you save."
     }
     static var settingsAccountsPageTitle: String { zh ? "账户设置" : "Account Settings" }
     static var settingsUsagePageTitle: String { zh ? "用量设置" : "Usage Settings" }
     static var settingsCodexAppPathPageTitle: String { zh ? "Codex App 路径设置" : "Codex App Path" }
-    static var settingsRecommendationPageTitle: String { zh ? "弹窗推荐设置" : "Recommendation Prompt Settings" }
     static var settingsUpdatesPageTitle: String { zh ? "更新" : "Updates" }
     static var settingsUpdatesPageHint: String {
         zh
@@ -208,16 +172,6 @@ enum L {
         let teamWeight = String(format: "%.1f", absoluteTeamWeight)
         return zh ? "team=plus×\(ratio) (= \(teamWeight))" : "team=plus×\(ratio) (= \(teamWeight))"
     }
-    static var popupAlertThresholdTitle: String { zh ? "弹窗用量告警阈值" : "Popup Usage Alert Threshold" }
-    static var popupAlertThresholdHint: String {
-        zh
-            ? "当任一窗口的剩余用量低于该值时，在账号列表和菜单栏图标中高亮提示；启用自动切换时，也会用于推荐切换弹窗。设为 0% 可关闭。"
-            : "Highlight the account list and menu bar icon when any window's remaining quota drops below this value. When auto-switch is enabled, the same threshold also drives the recommended switch popup. Set to 0% to disable."
-    }
-    static func popupAlertThresholdValue(_ value: Int) -> String {
-        zh ? "剩余 ≤ \(value)%" : "Remaining <= \(value)%"
-    }
-    static var popupAlertDisabled: String { zh ? "已关闭" : "Off" }
     static var accountOrderTitle: String { zh ? "OpenAI 账号顺序" : "OpenAI Account Order" }
     static var accountOrderingModeTitle: String { zh ? "账号排序方式" : "Account Ordering" }
     static var accountOrderingModeHint: String {
@@ -247,8 +201,8 @@ enum L {
     static var manualActivationBehaviorTitle: String { zh ? "手动点击 OpenAI 账号时" : "When Manually Clicking an OpenAI Account" }
     static var manualActivationBehaviorHint: String {
         zh
-            ? "只影响 OpenAI OAuth 账号的手动点击。它不会影响自动推荐弹窗，也不会扩展到 custom provider。"
-            : "This only affects manual clicks on OpenAI OAuth accounts. It does not affect auto-routing recommendation prompts or custom providers."
+            ? "只影响 OpenAI OAuth 账号的手动点击，不会扩展到 custom provider。"
+            : "This only affects manual clicks on OpenAI OAuth accounts and does not extend to custom providers."
     }
     static var manualActivationUpdateConfigOnly: String { zh ? "仅修改配置" : "Update Config Only" }
     static var manualActivationUpdateConfigOnlyHint: String {
@@ -282,33 +236,8 @@ enum L {
             ? "所选路径不是有效的 Codex.app。请确认它是绝对路径、名为 Codex.app，并包含 Contents/Resources/codex。"
             : "The selected path is not a valid Codex.app. Make sure it is an absolute path named Codex.app and includes Contents/Resources/codex."
     }
-    static var autoRoutingPromptModeTitle: String { zh ? "自动切换推荐弹窗" : "Auto-Switch Recommendation Prompt" }
-    static var autoRoutingPromptModeHint: String {
-        zh
-            ? "仅影响 autoThreshold 推荐；autoUnavailable / autoExhausted 仍会走独立 forced failover 保护。"
-            : "This only affects autoThreshold recommendations. autoUnavailable and autoExhausted still use forced failover protection."
-    }
-    static var autoRoutingPromptModeLaunchNewInstance: String { zh ? "切换并新开实例" : "Switch and Launch New Instance" }
-    static var autoRoutingPromptModeLaunchNewInstanceHint: String {
-        zh ? "确认后切账号、新开 Codex.app，并关闭旧实例。" : "After confirmation, switch accounts, launch a new Codex.app instance, and close the old one."
-    }
-    static var autoRoutingPromptModeRemindOnly: String { zh ? "只弹窗提醒" : "Remind Only" }
-    static var autoRoutingPromptModeRemindOnlyHint: String {
-        zh ? "只提示推荐账号，不切账号、不新开实例，也不关闭旧实例。" : "Only show the recommendation. Do not switch accounts, launch a new instance, or close the old one."
-    }
-    static var autoRoutingPromptModeDisabled: String { zh ? "关闭推荐弹窗" : "Disable Recommendation Prompt" }
-    static var autoRoutingPromptModeDisabledHint: String {
-        zh ? "彻底关闭阈值型推荐弹窗，但不影响 forced failover。" : "Turn off threshold-based recommendation prompts without affecting forced failover."
-    }
     static var openAICSVExportPrompt: String { zh ? "导出" : "Export" }
     static var openAICSVImportPrompt: String { zh ? "导入" : "Import" }
-    static var openAICSVRiskTitle: String { zh ? "导出将包含敏感 OAuth token" : "Export Includes Sensitive OAuth Tokens" }
-    static var openAICSVRiskMessage: String {
-        zh
-            ? "导出的 CSV 将包含 access_token、refresh_token 和 id_token。请仅保存到受信任位置，避免分享或同步到不安全环境。"
-            : "The exported CSV includes access_token, refresh_token, and id_token. Save it only to a trusted location and avoid sharing or syncing it to insecure destinations."
-    }
-    static var openAICSVRiskConfirm: String { zh ? "继续导出" : "Export Anyway" }
     static var noOpenAIAccountsToExport: String {
         zh ? "没有可导出的 OpenAI 账号" : "No OpenAI accounts available to export"
     }
@@ -361,22 +290,8 @@ enum L {
         zh ? "CSV 第 \(row) 行的 is_active 值无效。" : "CSV row \(row) has an invalid is_active value."
     }
     static var quit: String            { zh ? "退出"               : "Quit" }
-    static var switchAccount: String    { zh ? "切换账号"            : "Switch Account" }
-    static var switchTitle: String     { zh ? "切换账号"            : "Switch Account" }
-    static var continueRestart: String { zh ? "继续"               : "Continue" }
     static var cancel: String          { zh ? "取消"               : "Cancel" }
     static var justUpdated: String     { zh ? "刚刚更新"            : "Just updated" }
-    static var restartCodexTitle: String {
-        zh ? "Codex.app 正在运行" : "Codex.app is Running"
-    }
-    static var restartCodexInfo: String {
-        zh
-            ? "账号已切换完成。\n\n如需立即生效，可强制退出 Codex.app（可选是否自动重新打开）。\n\n⚠️ 警告：强制退出将终止所有 subagent 任务，可能导致进行中的任务丢失，请谨慎操作。"
-            : "Account switched successfully.\n\nYou may force-quit Codex.app now to apply the change (optionally reopen it).\n\n⚠️ Warning: Force-quitting will kill all running subagent tasks. Make sure no important tasks are in progress."
-    }
-    static var forceQuitAndReopen: String { zh ? "强制退出并重新打开" : "Force Quit & Reopen" }
-    static var forceQuitOnly: String    { zh ? "仅强制退出" : "Force Quit Only" }
-    static var restartLater: String     { zh ? "稍后手动重启" : "Later" }
 
     static func available(_ n: Int, _ total: Int) -> String {
         zh ? "\(n)/\(total) 可用" : "\(n)/\(total) Available"
@@ -387,50 +302,6 @@ enum L {
     static func hoursAgo(_ h: Int) -> String {
         zh ? "\(h) 小时前更新" : "Updated \(h) hr ago"
     }
-    static var switchWarningTitle: String {
-        zh ? "⚠️ 实验性功能 — 账号切换" : "⚠️ Experimental — Account Switch"
-    }
-    static func switchConfirm(_ name: String) -> String { switchWarning(name) }
-    static func switchConfirmMsg(_ name: String) -> String { switchWarning(name) }
-    static func switchWarning(_ name: String) -> String {
-        zh
-            ? "⚠️ 实验性功能\n\n将切换到「\(name)」。\n\n此功能通过直接修改配置文件实现辅助切换，需要退出整个 Codex.app 才能生效。退出过程中可能导致数据丢失！\n\n如果你正在使用 subagent，强烈建议通过软件内的退出登录功能重新登录其他账号，而非使用此切换方案。"
-            : "⚠️ Experimental Feature\n\nSwitching to \"\(name)\".\n\nThis feature works by modifying the config file directly. Codex.app must be fully quit to apply the change, which may cause data loss.\n\nIf you are using subagents, it is strongly recommended to log out from within Codex.app and log in with another account instead."
-    }
-
-    // MARK: - Auto switch
-    static var autoSwitchTitle: String {
-        zh ? "已自动切换账号" : "Account Auto-Switched"
-    }
-    static var autoSwitchPromptTitle: String {
-        zh ? "推荐切换并新开实例" : "Recommended: Switch and Launch New Instance"
-    }
-    static func autoSwitchPromptBody(_ from: String, _ to: String) -> String {
-        zh
-            ? "当前账号「\(from)」额度已接近阈值。\n\n推荐切换到「\(to)」，并新开一个 Codex 实例。\n\n如果你点“确定”，Codexbar 会切到推荐账号，启动一个新实例，然后关闭当前运行中的 Codex 实例。"
-            : "The current account \"\(from)\" is close to its quota threshold.\n\nCodexbar recommends switching to \"\(to)\" and launching a new Codex instance.\n\nIf you choose Confirm, Codexbar will switch to the recommended account, launch a new instance, and close the currently running Codex instance."
-    }
-    static var autoSwitchReminderTitle: String {
-        zh ? "推荐切换账号" : "Recommended Account Switch"
-    }
-    static func autoSwitchReminderBody(_ from: String, _ to: String) -> String {
-        zh
-            ? "当前账号「\(from)」额度已接近阈值。\n\n建议下一次切换到「\(to)」。\n\n当前模式仅提醒，不会自动切账号、不会新开实例，也不会关闭旧实例。若要切换，请在账号列表中手动点击“使用”。"
-            : "The current account \"\(from)\" is close to its quota threshold.\n\nCodexbar recommends switching to \"\(to)\" next.\n\nThis mode is reminder-only: it will not switch accounts, launch a new instance, or close the current one. Use the account list's Use button if you want to switch manually."
-    }
-    static var confirm: String { zh ? "确定" : "Confirm" }
-    static var acknowledge: String { zh ? "知道了" : "OK" }
-    static func autoSwitchBody(_ from: String, _ to: String) -> String {
-        zh
-            ? "「\(from)」额度不足，已自动切换至「\(to)」"
-            : "Quota low on \"\(from)\", switched to \"\(to)\""
-    }
-    static var autoSwitchNoCandidates: String {
-        zh
-            ? "所有账号额度不足或不可用，请手动处理"
-            : "All accounts are low or unavailable, please take action"
-    }
-
     // MARK: - AccountRowView
     static var reauth: String          { zh ? "重新授权"     : "Re-authorize" }
     static var useBtn: String          { zh ? "使用"         : "Use" }
@@ -480,10 +351,6 @@ enum L {
         zh ? "另有 \(count) 个未归因线程" : "\(count) unattributed thread\(count == 1 ? "" : "s")"
     }
 
-    static func deletePrompt(_ name: String) -> String {
-        zh ? "确认删除 \(name)？" : "Delete \(name)?"
-    }
-    static func confirmDelete(_ name: String) -> String { deletePrompt(name) }
     static var delete: String         { zh ? "删除"     : "Delete" }
     static var tokenExpiredHint: String { zh ? "Token 已过期，请重新授权" : "Token expired, please re-authorize" }
     static var accountSuspended: String { zh ? "账号已停用" : "Account suspended" }

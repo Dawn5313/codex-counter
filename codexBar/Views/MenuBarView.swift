@@ -280,7 +280,6 @@ struct MenuBarView: View {
     @State private var isProvidersExpanded = false
     @State private var countdownTimerConnection: Cancellable?
     @State private var runningThreadTimerConnection: Cancellable?
-    @State private var autoRoutingPromptSuppressedKey: String?
     @State private var autoRoutingDecisionInFlight = false
 
     private let countdownTimer = Timer.publish(every: 10, on: .main, in: .common)
@@ -358,7 +357,6 @@ struct MenuBarView: View {
             currentAccountID: self.store.activeAccount()?.accountId,
             settings: self.store.config.autoRouting,
             fallbackReason: .startupBestAccount,
-            popupAlertThresholdPercent: self.store.config.openAI.popupAlertThresholdPercent,
             quotaSortSettings: self.store.config.openAI.quotaSort
         )
     }
@@ -818,7 +816,6 @@ struct MenuBarView: View {
                             account: account,
                             rowState: rowState,
                             isRefreshing: refreshingAccounts.contains(account.id),
-                            popupAlertThresholdPercent: self.store.config.openAI.popupAlertThresholdPercent,
                             usageDisplayMode: self.store.config.openAI.usageDisplayMode,
                             defaultManualActivationBehavior: self.store.config.openAI.manualActivationBehavior
                         ) { trigger in
@@ -1257,35 +1254,12 @@ struct MenuBarView: View {
 
     private func handleAutoRoutingDecision() {
         guard self.autoRoutingDecisionInFlight == false else { return }
-
-        let plan = AutoRoutingDecisionPlanner.plan(
-            decision: self.currentAutoRoutingDecision,
-            promptMode: self.store.config.autoRouting.promptMode,
-            currentAccountID: self.store.activeAccount()?.accountId,
-            suppressedPromptKey: self.autoRoutingPromptSuppressedKey
-        )
-
-        switch plan {
-        case .none(let clearSuppression):
-            if clearSuppression {
-                self.autoRoutingPromptSuppressedKey = nil
-            }
-        case .suppressed:
-            return
-        case .forcedFailover(let decision):
-            self.executeForcedAutoRouting(decision)
-        case let .thresholdPrompt(mode, promptKey, decision):
-            self.presentThresholdAutoRoutingPrompt(
-                decision,
-                promptKey: promptKey,
-                mode: mode
-            )
-        }
+        guard let decision = self.currentAutoRoutingDecision else { return }
+        self.executeForcedAutoRouting(decision)
     }
 
     private func executeForcedAutoRouting(_ decision: AutoRoutingPolicy.Decision) {
         guard self.autoRoutingDecisionInFlight == false else { return }
-        self.autoRoutingPromptSuppressedKey = nil
         self.autoRoutingDecisionInFlight = true
 
         Task {
@@ -1298,62 +1272,6 @@ struct MenuBarView: View {
                 )
             } catch {
                 self.showError = error.localizedDescription
-            }
-        }
-    }
-
-    private func presentThresholdAutoRoutingPrompt(
-        _ decision: AutoRoutingPolicy.Decision,
-        promptKey: String,
-        mode: CodexBarAutoRoutingPromptMode
-    ) {
-        guard self.autoRoutingDecisionInFlight == false else { return }
-
-        let fromLabel = self.store.activeAccount()?.email ?? self.store.activeAccount()?.accountId ?? "Current"
-        let toLabel = decision.account.email.isEmpty ? decision.account.accountId : decision.account.email
-
-        let alert = NSAlert()
-        switch mode {
-        case .launchNewInstance:
-            alert.messageText = L.autoSwitchPromptTitle
-            alert.informativeText = L.autoSwitchPromptBody(fromLabel, toLabel)
-            alert.addButton(withTitle: L.confirm)
-            alert.addButton(withTitle: L.cancel)
-            alert.alertStyle = .warning
-        case .remindOnly:
-            alert.messageText = L.autoSwitchReminderTitle
-            alert.informativeText = L.autoSwitchReminderBody(fromLabel, toLabel)
-            alert.addButton(withTitle: L.acknowledge)
-            alert.alertStyle = .informational
-        case .disabled:
-            return
-        }
-
-        self.autoRoutingDecisionInFlight = true
-        let response = alert.runModal()
-        self.autoRoutingPromptSuppressedKey = promptKey
-
-        guard response == .alertFirstButtonReturn else {
-            self.autoRoutingDecisionInFlight = false
-            return
-        }
-
-        guard mode == .launchNewInstance else {
-            self.autoRoutingDecisionInFlight = false
-            return
-        }
-
-        Task {
-            defer { self.autoRoutingDecisionInFlight = false }
-
-            do {
-                try await self.performAutomaticAutoRoutingSwitch(
-                    decision,
-                    forced: false
-                )
-            } catch {
-                self.showError = error.localizedDescription
-                self.autoRoutingPromptSuppressedKey = nil
             }
         }
     }

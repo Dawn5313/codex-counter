@@ -60,25 +60,6 @@ protocol AppUpdateCapabilityEvaluating {
     ) -> [AppUpdateBlocker]
 }
 
-protocol AppUpdatePresenting {
-    func promptForAvailableUpdate(
-        _ availability: AppUpdateAvailability,
-        trigger: UpdateCheckTrigger
-    ) -> AppUpdatePromptChoice
-
-    func showUpToDate(
-        currentVersion: String,
-        checkedVersion: String
-    )
-
-    func showFailure(
-        _ message: String,
-        trigger: UpdateCheckTrigger
-    )
-
-    func showGuidedDownloadStarted(_ availability: AppUpdateAvailability)
-}
-
 protocol AppUpdateActionExecuting {
     func execute(_ availability: AppUpdateAvailability) async throws
 }
@@ -91,11 +72,6 @@ struct AppSignatureInspection: Equatable {
 struct AppGatekeeperInspection: Equatable {
     var passesAssessment: Bool
     var summary: String
-}
-
-enum AppUpdatePromptChoice {
-    case install
-    case cancel
 }
 
 struct LiveAppUpdateEnvironment: AppUpdateEnvironmentProviding {
@@ -336,96 +312,6 @@ struct LiveAppUpdateActionExecutor: AppUpdateActionExecuting {
     }
 }
 
-struct LiveAppUpdatePresenter: AppUpdatePresenting {
-    func promptForAvailableUpdate(
-        _ availability: AppUpdateAvailability,
-        trigger: UpdateCheckTrigger
-    ) -> AppUpdatePromptChoice {
-        let alert = NSAlert()
-        alert.messageText = L.updateAvailableTitle(availability.release.version)
-        alert.informativeText = self.promptBody(for: availability)
-        alert.addButton(
-            withTitle: availability.isAutomaticUpdateAllowed
-                ? L.updateNow
-                : L.downloadUpdate
-        )
-        alert.addButton(withTitle: L.cancel)
-        alert.alertStyle = .informational
-
-        return alert.runModal() == .alertFirstButtonReturn ? .install : .cancel
-    }
-
-    func showUpToDate(
-        currentVersion: String,
-        checkedVersion: String
-    ) {
-        let alert = NSAlert()
-        alert.messageText = L.updateUpToDateTitle
-        alert.informativeText = L.updateUpToDateBody(currentVersion, checkedVersion)
-        alert.addButton(withTitle: L.acknowledge)
-        alert.alertStyle = .informational
-        alert.runModal()
-    }
-
-    func showFailure(
-        _ message: String,
-        trigger: UpdateCheckTrigger
-    ) {
-        guard trigger != .automaticStartup else { return }
-
-        let alert = NSAlert()
-        alert.messageText = L.updateFailedTitle
-        alert.informativeText = message
-        alert.addButton(withTitle: L.acknowledge)
-        alert.alertStyle = .warning
-        alert.runModal()
-    }
-
-    func showGuidedDownloadStarted(_ availability: AppUpdateAvailability) {
-        let alert = NSAlert()
-        alert.messageText = L.updateGuidedDownloadStartedTitle
-        alert.informativeText = L.updateGuidedDownloadStartedBody(
-            availability.release.version,
-            availability.selectedArtifact.architecture.displayName,
-            availability.selectedArtifact.format.rawValue.uppercased()
-        )
-        alert.addButton(withTitle: L.acknowledge)
-        alert.alertStyle = .informational
-        alert.runModal()
-    }
-
-    private func promptBody(for availability: AppUpdateAvailability) -> String {
-        var lines: [String] = [
-            L.updatePromptVersionLine(
-                availability.currentVersion,
-                availability.release.version
-            ),
-        ]
-
-        if let summary = availability.release.summary?.trimmingCharacters(in: .whitespacesAndNewlines),
-           summary.isEmpty == false {
-            lines.append(summary)
-        }
-
-        if availability.isAutomaticUpdateAllowed {
-            lines.append(L.updateAutomaticPromptBody)
-        } else {
-            lines.append(
-                L.updateGuidedPromptBody(
-                    availability.selectedArtifact.architecture.displayName,
-                    availability.selectedArtifact.format.rawValue.uppercased()
-                )
-            )
-            if availability.blockers.isEmpty == false {
-                let blockerLines = availability.blockers.map { "• \($0.localizedDescription)" }
-                lines.append(blockerLines.joined(separator: "\n"))
-            }
-        }
-
-        return lines.joined(separator: "\n\n")
-    }
-}
-
 @MainActor
 final class UpdateCoordinator: ObservableObject {
     static let shared = UpdateCoordinator()
@@ -436,7 +322,6 @@ final class UpdateCoordinator: ObservableObject {
     private let feedLoader: AppUpdateFeedLoading
     private let environment: AppUpdateEnvironmentProviding
     private let capabilityEvaluator: AppUpdateCapabilityEvaluating
-    private let presenter: AppUpdatePresenting
     private let actionExecutor: AppUpdateActionExecuting
 
     private var hasStarted = false
@@ -451,7 +336,6 @@ final class UpdateCoordinator: ObservableObject {
                 gatekeeperInspector: LocalGatekeeperInspector(),
                 automaticUpdaterAvailable: false
             ),
-            presenter: LiveAppUpdatePresenter(),
             actionExecutor: LiveAppUpdateActionExecutor()
         )
     }
@@ -460,13 +344,11 @@ final class UpdateCoordinator: ObservableObject {
         feedLoader: AppUpdateFeedLoading,
         environment: AppUpdateEnvironmentProviding,
         capabilityEvaluator: AppUpdateCapabilityEvaluating,
-        presenter: AppUpdatePresenting,
         actionExecutor: AppUpdateActionExecuting
     ) {
         self.feedLoader = feedLoader
         self.environment = environment
         self.capabilityEvaluator = capabilityEvaluator
-        self.presenter = presenter
         self.actionExecutor = actionExecutor
     }
 
@@ -498,9 +380,11 @@ final class UpdateCoordinator: ObservableObject {
     }
 
     func handleToolbarAction() async {
-        await self.checkForUpdates(
-            trigger: self.pendingAvailability == nil ? .manual : .userInitiatedInstall
-        )
+        if let pendingAvailability = self.pendingAvailability {
+            await self.execute(pendingAvailability)
+        } else {
+            await self.checkForUpdates(trigger: .manual)
+        }
     }
 
     func checkForUpdates(trigger: UpdateCheckTrigger) async {
@@ -513,24 +397,16 @@ final class UpdateCoordinator: ObservableObject {
             if let availability = try self.resolveAvailability(from: feed) {
                 self.pendingAvailability = availability
                 self.state = .updateAvailable(availability)
-                await self.presentAndExecuteIfConfirmed(availability, trigger: trigger)
             } else {
                 self.pendingAvailability = nil
                 self.state = .upToDate(
                     currentVersion: self.environment.currentVersion,
                     checkedVersion: feed.release.version
                 )
-                if trigger != .automaticStartup {
-                    self.presenter.showUpToDate(
-                        currentVersion: self.environment.currentVersion,
-                        checkedVersion: feed.release.version
-                    )
-                }
             }
         } catch {
             let message = error.localizedDescription
             self.state = .failed(message)
-            self.presenter.showFailure(message, trigger: trigger)
         }
     }
 
@@ -561,32 +437,16 @@ final class UpdateCoordinator: ObservableObject {
         )
     }
 
-    private func presentAndExecuteIfConfirmed(
-        _ availability: AppUpdateAvailability,
-        trigger: UpdateCheckTrigger
-    ) async {
-        let choice = self.presenter.promptForAvailableUpdate(
-            availability,
-            trigger: trigger
-        )
-        guard choice == .install else {
-            self.state = .updateAvailable(availability)
-            return
-        }
-
+    private func execute(_ availability: AppUpdateAvailability) async {
         self.state = .executing(availability)
 
         do {
             try await self.actionExecutor.execute(availability)
             self.pendingAvailability = availability
             self.state = .updateAvailable(availability)
-            if availability.isAutomaticUpdateAllowed == false {
-                self.presenter.showGuidedDownloadStarted(availability)
-            }
         } catch {
             let message = error.localizedDescription
             self.state = .failed(message)
-            self.presenter.showFailure(message, trigger: trigger)
         }
     }
 }

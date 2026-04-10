@@ -71,7 +71,7 @@
 但要特别说明当前边界：
 
 - 当前稳定版本默认仍是 **guided download / install**
-- 这表示发现新版本后，codexbar 会提示你，并打开匹配 Apple Silicon / Intel 的安装包下载链接
+- 这表示发现新版本后，codexbar 会在菜单和更新状态里显示可用版本，由你继续打开匹配 Apple Silicon / Intel 的安装包下载链接
 - 当前版本**不会假装**已经支持自动替换旧 app 并自动重启
 - `1.1.5 -> 首个支持 updater 的版本` 仍要求人工安装 bootstrap
 - 真正自动更新闭环只会从“首个支持 updater 的版本 -> 下一版本”开始验证

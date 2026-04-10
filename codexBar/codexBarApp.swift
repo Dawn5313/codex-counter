@@ -52,8 +52,7 @@ struct MenuBarIconView: View {
     private var iconName: String {
         MenuBarIconResolver.iconName(
             accounts: store.accounts,
-            activeProviderKind: store.activeProvider?.kind,
-            popupAlertThresholdPercent: store.config.openAI.popupAlertThresholdPercent
+            activeProviderKind: store.activeProvider?.kind
         )
     }
 
