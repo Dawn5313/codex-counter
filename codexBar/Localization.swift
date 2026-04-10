@@ -33,6 +33,13 @@ enum L {
     static var addAccountHint: String  { zh ? "点击下方 + 添加账号"   : "Tap + below to add an account" }
     static var refreshUsage: String    { zh ? "刷新用量"            : "Refresh Usage" }
     static var checkForUpdates: String { zh ? "检查更新"            : "Check for Updates" }
+    static func menuUpdateAvailableTitle(_ version: String) -> String {
+        zh ? "发现新版本 v\(version)" : "Version \(version) Is Available"
+    }
+    static func menuUpdateAvailableSubtitle(_ currentVersion: String, _ latestVersion: String) -> String {
+        zh ? "当前为 \(currentVersion)，现在可以继续下载或安装 \(latestVersion)。" : "You're on \(currentVersion). Download or install \(latestVersion) now."
+    }
+    static var menuUpdateAction: String { zh ? "更新" : "Update" }
     static var addAccount: String      { zh ? "添加账号"            : "Add Account" }
     static var openAICSVToolbar: String { zh ? "导入或导出 OpenAI CSV" : "Import or Export OpenAI CSV" }
     static func codexLaunchSwitchedInstanceStarted(_ account: String) -> String {

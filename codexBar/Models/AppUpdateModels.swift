@@ -2,6 +2,7 @@ import Foundation
 
 enum UpdateCheckTrigger: Equatable {
     case automaticStartup
+    case automaticDaily
     case manual
     case userInitiatedInstall
 }

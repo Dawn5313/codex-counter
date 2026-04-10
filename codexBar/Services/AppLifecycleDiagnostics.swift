@@ -150,6 +150,7 @@ final class AppLifecycleObserver: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         Task { @MainActor in
             OpenAIUsagePollingService.shared.stop()
+            UpdateCoordinator.shared.stop()
         }
         AppLifecycleDiagnostics.shared.markTermination(reason: "applicationWillTerminate")
     }

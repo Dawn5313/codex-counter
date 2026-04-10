@@ -14,7 +14,7 @@ struct codexBarApp: App {
                 .environmentObject(oauth)
                 .environmentObject(updateCoordinator)
         } label: {
-            MenuBarIconView(store: store)
+            MenuBarIconView(store: store, updateCoordinator: updateCoordinator)
         }
         .menuBarExtraStyle(.window)
     }
@@ -23,6 +23,7 @@ struct codexBarApp: App {
 /// 菜单栏图标：显示 terminal 图标 + 活跃账号的 5h / 周额度
 struct MenuBarIconView: View {
     @ObservedObject var store: TokenStore
+    @ObservedObject var updateCoordinator: UpdateCoordinator
 
     var body: some View {
         HStack(spacing: 3) {
@@ -52,7 +53,8 @@ struct MenuBarIconView: View {
     private var iconName: String {
         MenuBarIconResolver.iconName(
             accounts: store.accounts,
-            activeProviderKind: store.activeProvider?.kind
+            activeProviderKind: store.activeProvider?.kind,
+            updateAvailable: self.updateCoordinator.pendingAvailability != nil
         )
     }
 

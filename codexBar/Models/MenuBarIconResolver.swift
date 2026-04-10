@@ -3,8 +3,13 @@ import Foundation
 enum MenuBarIconResolver {
     static func iconName(
         accounts: [TokenAccount],
-        activeProviderKind: CodexBarProviderKind?
+        activeProviderKind: CodexBarProviderKind?,
+        updateAvailable: Bool = false
     ) -> String {
+        if updateAvailable {
+            return "arrow.down.circle.fill"
+        }
+
         if let active = accounts.first(where: { $0.isActive }) {
             return self.iconName(
                 for: [active],

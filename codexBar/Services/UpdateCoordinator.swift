@@ -2,6 +2,8 @@ import AppKit
 import Combine
 import Foundation
 
+private let defaultAutomaticUpdateCheckInterval: TimeInterval = 24 * 60 * 60
+
 enum AppUpdateError: LocalizedError {
     case missingFeedURL
     case invalidCurrentVersion(String)
@@ -64,6 +66,17 @@ protocol AppUpdateActionExecuting {
     func execute(_ availability: AppUpdateAvailability) async throws
 }
 
+protocol AppUpdateAutomaticCheckCancelling {
+    func cancel()
+}
+
+protocol AppUpdateAutomaticCheckScheduling {
+    func scheduleRepeating(
+        every interval: TimeInterval,
+        operation: @escaping @Sendable @MainActor () async -> Void
+    ) -> AppUpdateAutomaticCheckCancelling
+}
+
 struct AppSignatureInspection: Equatable {
     var hasUsableSignature: Bool
     var summary: String
@@ -72,6 +85,48 @@ struct AppSignatureInspection: Equatable {
 struct AppGatekeeperInspection: Equatable {
     var passesAssessment: Bool
     var summary: String
+}
+
+final class TaskBasedAutomaticCheckHandle: AppUpdateAutomaticCheckCancelling {
+    private var task: Task<Void, Never>?
+
+    init(task: Task<Void, Never>) {
+        self.task = task
+    }
+
+    func cancel() {
+        self.task?.cancel()
+        self.task = nil
+    }
+
+    deinit {
+        self.cancel()
+    }
+}
+
+struct TaskBasedAutomaticCheckScheduler: AppUpdateAutomaticCheckScheduling {
+    func scheduleRepeating(
+        every interval: TimeInterval,
+        operation: @escaping @Sendable @MainActor () async -> Void
+    ) -> AppUpdateAutomaticCheckCancelling {
+        let clampedInterval = max(interval, 1)
+        let sleepNanoseconds = UInt64(clampedInterval * 1_000_000_000)
+
+        let task = Task {
+            while Task.isCancelled == false {
+                do {
+                    try await Task.sleep(nanoseconds: sleepNanoseconds)
+                } catch {
+                    return
+                }
+
+                guard Task.isCancelled == false else { return }
+                await operation()
+            }
+        }
+
+        return TaskBasedAutomaticCheckHandle(task: task)
+    }
 }
 
 struct LiveAppUpdateEnvironment: AppUpdateEnvironmentProviding {
@@ -323,8 +378,11 @@ final class UpdateCoordinator: ObservableObject {
     private let environment: AppUpdateEnvironmentProviding
     private let capabilityEvaluator: AppUpdateCapabilityEvaluating
     private let actionExecutor: AppUpdateActionExecuting
+    private let automaticCheckScheduler: AppUpdateAutomaticCheckScheduling
+    private let automaticCheckInterval: TimeInterval
 
     private var hasStarted = false
+    private var automaticCheckHandle: AppUpdateAutomaticCheckCancelling?
 
     convenience init() {
         let environment = LiveAppUpdateEnvironment()
@@ -336,7 +394,25 @@ final class UpdateCoordinator: ObservableObject {
                 gatekeeperInspector: LocalGatekeeperInspector(),
                 automaticUpdaterAvailable: false
             ),
-            actionExecutor: LiveAppUpdateActionExecutor()
+            actionExecutor: LiveAppUpdateActionExecutor(),
+            automaticCheckScheduler: TaskBasedAutomaticCheckScheduler(),
+            automaticCheckInterval: defaultAutomaticUpdateCheckInterval
+        )
+    }
+
+    convenience init(
+        feedLoader: AppUpdateFeedLoading,
+        environment: AppUpdateEnvironmentProviding,
+        capabilityEvaluator: AppUpdateCapabilityEvaluating,
+        actionExecutor: AppUpdateActionExecuting
+    ) {
+        self.init(
+            feedLoader: feedLoader,
+            environment: environment,
+            capabilityEvaluator: capabilityEvaluator,
+            actionExecutor: actionExecutor,
+            automaticCheckScheduler: TaskBasedAutomaticCheckScheduler(),
+            automaticCheckInterval: defaultAutomaticUpdateCheckInterval
         )
     }
 
@@ -344,12 +420,16 @@ final class UpdateCoordinator: ObservableObject {
         feedLoader: AppUpdateFeedLoading,
         environment: AppUpdateEnvironmentProviding,
         capabilityEvaluator: AppUpdateCapabilityEvaluating,
-        actionExecutor: AppUpdateActionExecuting
+        actionExecutor: AppUpdateActionExecuting,
+        automaticCheckScheduler: AppUpdateAutomaticCheckScheduling,
+        automaticCheckInterval: TimeInterval
     ) {
         self.feedLoader = feedLoader
         self.environment = environment
         self.capabilityEvaluator = capabilityEvaluator
         self.actionExecutor = actionExecutor
+        self.automaticCheckScheduler = automaticCheckScheduler
+        self.automaticCheckInterval = automaticCheckInterval
     }
 
     var isChecking: Bool {
@@ -359,24 +439,26 @@ final class UpdateCoordinator: ObservableObject {
         return false
     }
 
-    var availableVersionLabel: String? {
-        self.pendingAvailability?.release.version
-    }
-
-    var toolbarHelpText: String {
-        if let availability = self.pendingAvailability {
-            return L.updateInstallActionHelp(availability.release.version)
-        }
-        return L.checkForUpdates
-    }
-
     func start() {
         guard self.hasStarted == false else { return }
         self.hasStarted = true
 
+        self.automaticCheckHandle = self.automaticCheckScheduler.scheduleRepeating(
+            every: self.automaticCheckInterval
+        ) { [weak self] in
+            guard let self else { return }
+            await self.checkForUpdates(trigger: .automaticDaily)
+        }
+
         Task {
             await self.checkForUpdates(trigger: .automaticStartup)
         }
+    }
+
+    func stop() {
+        self.automaticCheckHandle?.cancel()
+        self.automaticCheckHandle = nil
+        self.hasStarted = false
     }
 
     func handleToolbarAction() async {

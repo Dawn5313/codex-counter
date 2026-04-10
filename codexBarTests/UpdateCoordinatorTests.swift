@@ -81,6 +81,40 @@ final class UpdateCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.pendingAvailability?.selectedArtifact.architecture, .x86_64)
     }
 
+    func testStartSchedulesDailyAutomaticChecks() async {
+        let scheduler = MockAutomaticCheckScheduler()
+        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
+
+        let coordinator = UpdateCoordinator(
+            feedLoader: feedLoader,
+            environment: MockUpdateEnvironment(
+                currentVersion: "1.1.5",
+                architecture: .arm64
+            ),
+            capabilityEvaluator: MockCapabilityEvaluator(
+                blockers: [.feedRequiresGuidedDownload]
+            ),
+            actionExecutor: MockUpdateExecutor(),
+            automaticCheckScheduler: scheduler,
+            automaticCheckInterval: 123
+        )
+
+        coordinator.start()
+        await scheduler.waitUntilScheduled()
+        while feedLoader.loadCount < 1 {
+            await Task.yield()
+        }
+        XCTAssertEqual(scheduler.scheduledInterval, 123)
+
+        await scheduler.fire()
+        while feedLoader.loadCount < 2 {
+            await Task.yield()
+        }
+
+        XCTAssertEqual(feedLoader.loadCount, 2)
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
+    }
+
     func testManualCheckShowsUpToDateStateWhenVersionsMatch() async {
         let coordinator = UpdateCoordinator(
             feedLoader: MockFeedLoader(feed: self.makeFeed(version: "1.1.5")),
@@ -342,6 +376,34 @@ private final class MockUpdateExecutor: AppUpdateActionExecuting {
         }
         self.executed.append(availability)
     }
+}
+
+private final class MockAutomaticCheckScheduler: AppUpdateAutomaticCheckScheduling {
+    private(set) var scheduledInterval: TimeInterval?
+    private var operation: (@Sendable @MainActor () async -> Void)?
+
+    func scheduleRepeating(
+        every interval: TimeInterval,
+        operation: @escaping @Sendable @MainActor () async -> Void
+    ) -> AppUpdateAutomaticCheckCancelling {
+        self.scheduledInterval = interval
+        self.operation = operation
+        return MockAutomaticCheckHandle()
+    }
+
+    func waitUntilScheduled() async {
+        while self.scheduledInterval == nil {
+            await Task.yield()
+        }
+    }
+
+    func fire() async {
+        await self.operation?()
+    }
+}
+
+private struct MockAutomaticCheckHandle: AppUpdateAutomaticCheckCancelling {
+    func cancel() {}
 }
 
 private struct MockSignatureInspector: AppSignatureInspecting {

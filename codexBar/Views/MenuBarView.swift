@@ -442,39 +442,6 @@ struct MenuBarView: View {
 
                 Spacer()
 
-                if let availableVersion = self.updateCoordinator.availableVersionLabel {
-                    Text("v\(availableVersion)")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(.accentColor)
-                }
-
-                Button {
-                    Task { await self.updateCoordinator.handleToolbarAction() }
-                } label: {
-                    Group {
-                        if self.updateCoordinator.isChecking {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Image(systemName: self.updateCoordinator.pendingAvailability != nil
-                                ? "arrow.down.circle.fill"
-                                : "arrow.down.circle")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                    }
-                    .frame(width: 16, height: 16)
-                }
-                .buttonStyle(.borderless)
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
-                .help(self.updateCoordinator.toolbarHelpText)
-                .foregroundColor(
-                    self.updateCoordinator.pendingAvailability != nil
-                        ? .accentColor
-                        : .secondary
-                )
-                .disabled(self.updateCoordinator.isChecking)
-
                 Button {
                     Task { await refresh(announceResult: true) }
                 } label: {
@@ -523,6 +490,11 @@ struct MenuBarView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+            }
+
+            if let pendingAvailability = self.updateCoordinator.pendingAvailability {
+                Divider()
+                self.updateAvailableBanner(availability: pendingAvailability)
             }
 
             Divider()
@@ -672,6 +644,32 @@ struct MenuBarView: View {
             .padding(.vertical, 8)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func updateAvailableBanner(availability: AppUpdateAvailability) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.accentColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(L.menuUpdateAvailableTitle(availability.release.version))
+                    .font(.system(size: 11, weight: .medium))
+                Text(L.menuUpdateAvailableSubtitle(availability.currentVersion, availability.release.version))
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Button(L.menuUpdateAction) {
+                Task { await self.updateCoordinator.handleToolbarAction() }
+            }
+            .disabled(self.updateCoordinator.isChecking)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
