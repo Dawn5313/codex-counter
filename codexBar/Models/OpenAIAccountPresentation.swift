@@ -29,6 +29,23 @@ struct OpenAIAccountContextActionState: Equatable {
 enum OpenAIAccountPresentation {
     static let primaryManualActivationTrigger: OpenAIManualActivationTrigger = .primaryTap
 
+    static func planBadgeTitle(for account: TokenAccount, isHovered: Bool) -> String {
+        let normalizedPlanType = account.planType
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        guard normalizedPlanType == "team" else {
+            return account.planType.uppercased()
+        }
+
+        if isHovered,
+           let organizationName = self.trimmedOrganizationName(for: account) {
+            return organizationName
+        }
+
+        return "TEAM"
+    }
+
     static func rowState(
         for account: TokenAccount,
         attribution: OpenAILiveSessionAttribution,
@@ -168,5 +185,16 @@ enum OpenAIAccountPresentation {
         )
         guard summary.unknownSessionCount > 0 else { return base }
         return "\(base) · \(L.inUseUnknownSessions(summary.unknownSessionCount))"
+    }
+
+    private static func trimmedOrganizationName(
+        for account: TokenAccount
+    ) -> String? {
+        guard let organizationName = account.organizationName?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            organizationName.isEmpty == false else {
+            return nil
+        }
+        return organizationName
     }
 }

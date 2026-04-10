@@ -12,19 +12,15 @@ struct AccountRowView: View {
     let onReauth: () -> Void
     let onDelete: () -> Void
 
+    @State private var isHoveringPlanBadge = false
+
     var body: some View {
         HStack(spacing: 4) {
             Circle()
                 .fill(statusColor)
                 .frame(width: 7, height: 7)
 
-            Text(account.planType.uppercased())
-                .font(.system(size: 9, weight: .medium))
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(planBadgeColor.opacity(0.15))
-                .foregroundColor(planBadgeColor)
-                .cornerRadius(3)
+            self.planBadge
 
             usageSummary
 
@@ -143,6 +139,28 @@ struct AccountRowView: View {
                     .font(.system(size: 9, weight: .medium))
                     .foregroundColor(usageColor(window))
             }
+        }
+    }
+
+    private var planBadge: some View {
+        Text(
+            OpenAIAccountPresentation.planBadgeTitle(
+                for: self.account,
+                isHovered: self.isHoveringPlanBadge
+            )
+        )
+        .font(.system(size: 9, weight: .medium))
+        .lineLimit(1)
+        .truncationMode(.tail)
+        .frame(maxWidth: 120, alignment: .leading)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 1)
+        .background(planBadgeColor.opacity(0.15))
+        .foregroundColor(planBadgeColor)
+        .cornerRadius(3)
+        .contentShape(RoundedRectangle(cornerRadius: 3))
+        .onHover { isHovering in
+            self.isHoveringPlanBadge = isHovering
         }
     }
 

@@ -183,14 +183,101 @@ final class OpenAIAccountPresentationTests: XCTestCase {
         XCTAssertFalse(state.showsUseAction)
     }
 
-    private func makeAccount(accountId: String, isActive: Bool) -> TokenAccount {
+    func testPlanBadgeTitleShowsOrganizationNameForHoveredTeamAccount() {
+        let account = self.makeAccount(
+            accountId: "acct_team_hover",
+            isActive: false,
+            planType: "team",
+            organizationName: "Acme Team"
+        )
+
+        XCTAssertEqual(
+            OpenAIAccountPresentation.planBadgeTitle(for: account, isHovered: true),
+            "Acme Team"
+        )
+    }
+
+    func testPlanBadgeTitleShowsTeamForNonHoveredTeamAccount() {
+        let account = self.makeAccount(
+            accountId: "acct_team_idle",
+            isActive: false,
+            planType: "team",
+            organizationName: "Acme Team"
+        )
+
+        XCTAssertEqual(
+            OpenAIAccountPresentation.planBadgeTitle(for: account, isHovered: false),
+            "TEAM"
+        )
+    }
+
+    func testPlanBadgeTitleTrimsOrganizationNameForHoveredTeamAccount() {
+        let account = self.makeAccount(
+            accountId: "acct_team_trimmed",
+            isActive: false,
+            planType: "team",
+            organizationName: "  Acme Team  "
+        )
+
+        XCTAssertEqual(
+            OpenAIAccountPresentation.planBadgeTitle(for: account, isHovered: true),
+            "Acme Team"
+        )
+    }
+
+    func testPlanBadgeTitleFallsBackToTeamForHoveredTeamAccountWithoutOrganizationName() {
+        let nilNameAccount = self.makeAccount(
+            accountId: "acct_team_nil",
+            isActive: false,
+            planType: "team",
+            organizationName: nil
+        )
+        let blankNameAccount = self.makeAccount(
+            accountId: "acct_team_blank",
+            isActive: false,
+            planType: "team",
+            organizationName: "   "
+        )
+
+        XCTAssertEqual(
+            OpenAIAccountPresentation.planBadgeTitle(for: nilNameAccount, isHovered: true),
+            "TEAM"
+        )
+        XCTAssertEqual(
+            OpenAIAccountPresentation.planBadgeTitle(for: blankNameAccount, isHovered: true),
+            "TEAM"
+        )
+    }
+
+    func testPlanBadgeTitleKeepsOriginalPlanLabelForHoveredNonTeamAccount() {
+        let account = self.makeAccount(
+            accountId: "acct_plus_hover",
+            isActive: false,
+            planType: "plus",
+            organizationName: "Acme Team"
+        )
+
+        XCTAssertEqual(
+            OpenAIAccountPresentation.planBadgeTitle(for: account, isHovered: true),
+            "PLUS"
+        )
+    }
+
+    private func makeAccount(
+        accountId: String,
+        isActive: Bool,
+        planType: String = "free",
+        organizationName: String? = nil
+    ) -> TokenAccount {
         TokenAccount(
             email: "\(accountId)@example.com",
             accountId: accountId,
             accessToken: "access-\(accountId)",
             refreshToken: "refresh-\(accountId)",
             idToken: "id-\(accountId)",
-            isActive: isActive
+            planType: planType,
+            isActive: isActive,
+            organizationName: organizationName
         )
     }
 }
