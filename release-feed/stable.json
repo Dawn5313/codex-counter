@@ -2,37 +2,37 @@
   "schemaVersion": 1,
   "channel": "stable",
   "release": {
-    "version": "1.1.6",
-    "publishedAt": "2026-04-09T03:07:07Z",
-    "summary": "首个接入单一 update feed 与独立更新设置页的稳定版本；当前仍处于引导下载/安装模式，不宣称自动替换闭环。",
-    "releaseNotesURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.6",
-    "downloadPageURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.6",
+    "version": "1.1.7",
+    "publishedAt": "2026-04-11T08:48:45Z",
+    "summary": "延续聚合模式下的原生 fast tier 语义，补齐 service_tier 透传与同额度优先更早重置排序，并修正 OpenAI Accounts 头部对齐；当前仍处于引导下载/安装模式，不宣称自动替换闭环。",
+    "releaseNotesURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.7",
+    "downloadPageURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.7",
     "deliveryMode": "guidedDownload",
     "minimumAutomaticUpdateVersion": "1.1.6",
     "artifacts": [
       {
         "architecture": "universal",
         "format": "dmg",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.6/codexbar-1.1.6-macOS.dmg",
-        "sha256": "9077ebff411a6656af1a714a8600af707600f811553845e6ab765a786e1a918f"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS.dmg",
+        "sha256": "e493e529b8c55765a22572830bd0e51228024f2a49d2f911fb5d94c767b0cd63"
       },
       {
         "architecture": "universal",
         "format": "zip",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.6/codexbar-1.1.6-macOS.zip",
-        "sha256": "614c91c1748e9157cc07fa1035c2c4afc58e8910703f41c455fd38f250cd810b"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS.zip",
+        "sha256": "c40179352f2c69f79418715fb258ca7f49cdce2b49d7c468e20ae6c0e30b4fad"
       },
       {
         "architecture": "x86_64",
         "format": "dmg",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.6/codexbar-1.1.6-macOS-intel.dmg",
-        "sha256": "56c20614f947a0a2f4959406cd6c0265850d02113e5fbb3b04114b65a465ac28"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS-intel.dmg",
+        "sha256": "f30cc37c82d4495c7190ebdd139da7a488550d3475c47ba1550db295397da1dd"
       },
       {
         "architecture": "x86_64",
         "format": "zip",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.6/codexbar-1.1.6-macOS-intel.zip",
-        "sha256": "ee699142a2f4d4339cf290425935cf47ad4e56ddd14ba5e6488ca28099aefb76"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS-intel.zip",
+        "sha256": "ffd509b9e24808f46e090b7d523320a83afb6333ab772fc6a939733c7c7d0110"
       }
     ]
   }

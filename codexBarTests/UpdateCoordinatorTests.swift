@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class UpdateCoordinatorTests: XCTestCase {
     func testManualCheckStoresAvailableUpdateWithoutExecuting() async {
-        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
+        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.7"))
         let executor = MockUpdateExecutor()
 
         let coordinator = UpdateCoordinator(
@@ -23,16 +23,16 @@ final class UpdateCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(feedLoader.loadCount, 1)
         XCTAssertTrue(executor.executed.isEmpty)
-        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.7")
 
         guard case let .updateAvailable(availability) = coordinator.state else {
             return XCTFail("Expected updateAvailable state")
         }
-        XCTAssertEqual(availability.release.version, "1.1.6")
+        XCTAssertEqual(availability.release.version, "1.1.7")
     }
 
     func testToolbarActionExecutesPendingUpdateWithoutRefetching() async {
-        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
+        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.7"))
         let executor = MockUpdateExecutor()
 
         let coordinator = UpdateCoordinator(
@@ -54,12 +54,12 @@ final class UpdateCoordinatorTests: XCTestCase {
 
         XCTAssertEqual(feedLoader.loadCount, 1)
         XCTAssertEqual(executor.executed.count, 1)
-        XCTAssertEqual(executor.executed.first?.release.version, "1.1.6")
-        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
+        XCTAssertEqual(executor.executed.first?.release.version, "1.1.7")
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.7")
     }
 
     func testAutomaticAndManualChecksUseSameFeedResolution() async {
-        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
+        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.7"))
 
         let coordinator = UpdateCoordinator(
             feedLoader: feedLoader,
@@ -77,13 +77,13 @@ final class UpdateCoordinatorTests: XCTestCase {
         await coordinator.checkForUpdates(trigger: .manual)
 
         XCTAssertEqual(feedLoader.loadCount, 2)
-        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.7")
         XCTAssertEqual(coordinator.pendingAvailability?.selectedArtifact.architecture, .x86_64)
     }
 
     func testStartSchedulesDailyAutomaticChecks() async {
         let scheduler = MockAutomaticCheckScheduler()
-        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.6"))
+        let feedLoader = MockFeedLoader(feed: self.makeFeed(version: "1.1.7"))
 
         let coordinator = UpdateCoordinator(
             feedLoader: feedLoader,
@@ -112,7 +112,7 @@ final class UpdateCoordinatorTests: XCTestCase {
         }
 
         XCTAssertEqual(feedLoader.loadCount, 2)
-        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.6")
+        XCTAssertEqual(coordinator.pendingAvailability?.release.version, "1.1.7")
     }
 
     func testManualCheckShowsUpToDateStateWhenVersionsMatch() async {
@@ -138,7 +138,7 @@ final class UpdateCoordinatorTests: XCTestCase {
 
     func testCoordinatorFailsWhenCompatibleArtifactIsMissing() async {
         let feed = self.makeFeed(
-            version: "1.1.6",
+            version: "1.1.7",
             artifacts: [
                 AppUpdateArtifact(
                     architecture: .x86_64,
@@ -232,7 +232,7 @@ final class UpdateCoordinatorTests: XCTestCase {
 
         let blockers = evaluator.blockers(
             for: AppUpdateRelease(
-                version: "1.1.6",
+                version: "1.1.7",
                 publishedAt: nil,
                 summary: nil,
                 releaseNotesURL: URL(string: "https://example.com/release-notes")!,
@@ -278,7 +278,7 @@ final class UpdateCoordinatorTests: XCTestCase {
 
         let blockers = evaluator.blockers(
             for: AppUpdateRelease(
-                version: "1.1.6",
+                version: "1.1.7",
                 publishedAt: nil,
                 summary: nil,
                 releaseNotesURL: URL(string: "https://example.com/release-notes")!,
