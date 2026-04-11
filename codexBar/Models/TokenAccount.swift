@@ -251,16 +251,19 @@ extension TokenAccount {
         return .usable
     }
 
-    nonisolated func headerQuotaRemark(now: Date = Date()) -> String? {
-        let exhaustedWindows = self.rateLimitWindows(now: now)
-            .filter { $0.usedPercent >= 100 && $0.resetAt != nil }
-            .sorted { ($0.limitWindowSeconds ?? 0) > ($1.limitWindowSeconds ?? 0) }
-
-        guard let resetAt = exhaustedWindows.first?.resetAt else { return nil }
-        return self.compactResetRemaining(until: resetAt, now: now)
+    nonisolated func nearestResetAt(now: Date = Date()) -> Date? {
+        Self.nearestResetDate(
+            in: self.rateLimitWindows(now: now).compactMap(\.resetAt),
+            now: now
+        )
     }
 
-    nonisolated private func compactResetRemaining(until date: Date, now: Date) -> String {
+    nonisolated func headerQuotaRemark(now: Date = Date()) -> String? {
+        guard let resetAt = self.nearestResetAt(now: now) else { return nil }
+        return Self.compactResetRemaining(until: resetAt, now: now)
+    }
+
+    nonisolated static func compactResetRemaining(until date: Date, now: Date) -> String {
         let remainingSeconds = max(0, Int(date.timeIntervalSince(now)))
         let days = remainingSeconds / 86_400
         let hours = (remainingSeconds % 86_400) / 3_600
@@ -279,6 +282,15 @@ extension TokenAccount {
         }
 
         return L.compactResetSoon
+    }
+
+    nonisolated static func nearestResetDate(in dates: [Date], now: Date) -> Date? {
+        let futureDates = dates.filter { $0.timeIntervalSince(now) > 0 }
+        if futureDates.isEmpty == false {
+            return futureDates.min()
+        }
+
+        return dates.max()
     }
 
     nonisolated var usageWindowDisplays: [UsageWindowDisplay] {

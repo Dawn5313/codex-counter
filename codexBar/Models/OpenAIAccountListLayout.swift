@@ -24,7 +24,13 @@ extension OpenAIAccountGroup {
     }
 
     nonisolated func headerQuotaRemark(now: Date = Date()) -> String? {
-        representativeAccount?.headerQuotaRemark(now: now)
+        let nearestResetAt = TokenAccount.nearestResetDate(
+            in: self.accounts.compactMap { $0.nearestResetAt(now: now) },
+            now: now
+        )
+
+        guard let nearestResetAt else { return nil }
+        return TokenAccount.compactResetRemaining(until: nearestResetAt, now: now)
     }
 }
 
