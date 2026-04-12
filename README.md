@@ -17,8 +17,14 @@
 
 ## 界面预览
 
+下面两张图是**在本机本地生成的脱敏演示截图**：界面结构、按钮层级和当前产品一致，但全部使用 demo data，不会读取或改写你的真实账号、token 或 `~/.codex` 配置。
+
 <p align="center">
-  <img src="./zh.png" alt="codexbar screenshot" width="720" />
+  <img src="./docs/assets/readme-menu-demo.png" alt="codexbar menu preview" width="720" />
+</p>
+
+<p align="center">
+  <img src="./docs/assets/readme-settings-demo.png" alt="codexbar settings preview" width="720" />
 </p>
 
 ## 它主要解决什么问题
@@ -54,6 +60,10 @@
 - 多 OpenAI 兼容 provider 管理
 - 同一 provider 下挂多组 API key
 - 菜单栏里快速切换 provider / account
+- OpenAI 账号的 **手动切换 / 聚合网关** 双模式
+- OpenAI 账号 CSV 导入 / 导出
+- OpenAI 账号支持按用量排序 / 按手动顺序排序
+- 设置页里配置手动激活策略与 Codex.app 路径
 - 本地 usage / 成本统计
 - 单一 update feed 驱动的版本检测与手动“检查更新”
 
@@ -63,6 +73,14 @@
 - `~/.codex/archived_sessions`
 
 因此你能直接在本地看到 token 用量和成本估算，而不需要手动翻 session 文件。
+
+另外，当前界面还补上了几类更贴近真实日常切换的能力：
+
+- OpenAI 账号支持 **手动切换 / 聚合网关** 两种使用模式
+- 支持导入 / 导出 OpenAI 账号 CSV，方便迁移和批量整理
+- 支持在设置页里切换 OpenAI 账号排序方式：按当前用量排序，或按手动顺序展示
+- 支持设置手动激活行为：只改配置，或直接拉起新的 Codex 实例
+- 当选择“拉起新实例”时，可以在设置页指定 Codex.app 的本地路径；路径失效时会自动回退系统探测
 
 ## 版本检测与更新
 
@@ -91,9 +109,9 @@
 
 ## OpenAI 登录方式
 
-当前 OpenAI 登录采用“浏览器授权 + 手动粘贴回调链接”的方式：
+当前 OpenAI 登录采用“浏览器授权 + localhost 回调捕获，必要时可手工粘贴回调”的方式。入口在菜单底部工具栏的人像加号按钮：
 
-1. 点击 `login`
+1. 点击登录按钮
 2. 在浏览器里完成授权
 3. 当浏览器跳到 `http://localhost:1455/auth/callback?...` 时，codexbar 会自动捕获回调
 4. codexbar 直接完成 token 交换并导入账号

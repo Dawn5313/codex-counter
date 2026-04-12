@@ -17,10 +17,16 @@ The idea is simple:
 
 This means old sessions stay in the same history pool instead of being scattered across multiple Codex homes.
 
-## Screenshot
+## Screenshots
+
+The screenshots below are **locally generated, privacy-safe demo renders** produced on this Mac. They reflect the current UI structure and interaction surface, but use demo data only, so they do not read or modify real accounts, tokens, or `~/.codex` state.
 
 <p align="center">
-  <img src="./zh.png" alt="codexbar screenshot" width="720" />
+  <img src="./docs/assets/readme-menu-demo.png" alt="codexbar menu preview" width="720" />
+</p>
+
+<p align="center">
+  <img src="./docs/assets/readme-settings-demo.png" alt="codexbar settings preview" width="720" />
 </p>
 
 ## Problem It Solves
@@ -56,6 +62,10 @@ That is the main value of the app: switching account or provider does not mean s
 - Multiple OpenAI-compatible providers
 - Multiple API-key accounts under the same provider
 - Fast switching from the menu bar
+- Dual OpenAI account modes: **manual switch / aggregate gateway**
+- OpenAI account CSV import / export
+- OpenAI account ordering: quota-weighted or manual order
+- Settings for manual activation behavior and preferred Codex.app path
 - Local usage and cost estimates
 - Version detection driven by a single update feed plus a manual "Check for Updates" entry
 
@@ -65,6 +75,14 @@ Local usage and cost estimates are derived from:
 - `~/.codex/archived_sessions`
 
 So you can inspect token usage and estimated cost directly from local session history.
+
+The current UI also covers a few newer workflow details that the older README did not show clearly:
+
+- OpenAI accounts can run in either **manual switch** mode or **aggregate gateway** mode
+- OpenAI OAuth accounts can be imported from or exported to CSV
+- Settings also let you choose whether OpenAI accounts are shown by quota-weighted ranking or your own manual order
+- manual activation can either update config only or launch a fresh Codex instance
+- when launching a fresh instance, you can set a preferred local Codex.app path in Settings, and invalid paths fall back to automatic detection
 
 ## Version Checks and Updates
 
@@ -93,9 +111,9 @@ See also:
 
 ## OpenAI Login Flow
 
-OpenAI login currently uses a browser-based authorization flow plus manual callback paste:
+OpenAI login currently uses a browser-based authorization flow with localhost callback capture plus a manual fallback. The entry point is the person-plus button in the bottom toolbar:
 
-1. Click `login`
+1. Click the login button
 2. Finish authorization in the browser
 3. When the browser reaches `http://localhost:1455/auth/callback?...`, codexbar captures the callback automatically
 4. codexbar completes token exchange and imports the account
