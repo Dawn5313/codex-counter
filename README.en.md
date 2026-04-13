@@ -19,14 +19,30 @@ This means old sessions stay in the same history pool instead of being scattered
 
 ## Screenshots
 
-The screenshots below are **locally generated, privacy-safe demo renders** produced on this Mac. They reflect the current UI structure and interaction surface, but use demo data only, so they do not read or modify real accounts, tokens, or `~/.codex` state.
+The screenshots below are **privacy-safe demo renders maintained in this repository**. They mirror the current UI structure and interaction surface, but all visible fields are rewritten to demo data, so they do not expose real accounts or tokens and do not depend on a real local `~/.codex` / `~/.codexbar` setup.
+
+### 1. OpenAI Account View
+
+The main menu shows the current mode, plan badge, dual 5-hour / 7-day windows, and the reset timer that actually determines when an exhausted account becomes usable again.
 
 <p align="center">
-  <img src="./docs/assets/readme-menu-demo.png" alt="codexbar menu preview" width="720" />
+  <img src="./docs/assets/readme-openai-accounts-demo.png" alt="codexbar OpenAI accounts demo" width="760" />
 </p>
 
+### 2. Provider Management
+
+The provider section expands inline, so you can keep multiple OpenAI-compatible backends and multiple API-key accounts under each backend without leaving the menu bar workflow.
+
 <p align="center">
-  <img src="./docs/assets/readme-settings-demo.png" alt="codexbar settings preview" width="720" />
+  <img src="./docs/assets/readme-providers-demo.png" alt="codexbar providers demo" width="760" />
+</p>
+
+### 3. Settings Window
+
+The settings window consolidates account mode, manual activation behavior, preferred Codex Desktop path, ordering rules, and update controls into one dedicated surface.
+
+<p align="center">
+  <img src="./docs/assets/readme-settings-accounts-demo.png" alt="codexbar settings demo" width="1120" />
 </p>
 
 ## Problem It Solves

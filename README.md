@@ -17,14 +17,30 @@
 
 ## 界面预览
 
-下面两张图是**在本机本地生成的脱敏演示截图**：界面结构、按钮层级和当前产品一致，但全部使用 demo data，不会读取或改写你的真实账号、token 或 `~/.codex` 配置。
+下面这些图都是**仓库内维护的脱敏演示截图**：界面结构和交互表面与当前产品保持一致，但展示字段已经替换成 demo data，不会暴露真实账号、token，也不依赖你的真实 `~/.codex` / `~/.codexbar` 配置。
+
+### 1. OpenAI 账号视图
+
+可以直接看到当前模式、账号套餐、5 小时 / 7 天两层额度，以及“真正决定恢复可用性”的重置时间。
 
 <p align="center">
-  <img src="./docs/assets/readme-menu-demo.png" alt="codexbar menu preview" width="720" />
+  <img src="./docs/assets/readme-openai-accounts-demo.png" alt="codexbar OpenAI accounts demo" width="760" />
 </p>
 
+### 2. Provider 管理
+
+同一菜单里可以展开多个 OpenAI 兼容 provider，并在每个 provider 下维护多组 API key 账号。
+
 <p align="center">
-  <img src="./docs/assets/readme-settings-demo.png" alt="codexbar settings preview" width="720" />
+  <img src="./docs/assets/readme-providers-demo.png" alt="codexbar providers demo" width="760" />
+</p>
+
+### 3. 设置页
+
+设置页把账户模式、手动激活行为、Codex Desktop 路径、排序规则和更新检查整合在一个独立窗口里，不需要再手改配置文件。
+
+<p align="center">
+  <img src="./docs/assets/readme-settings-accounts-demo.png" alt="codexbar settings demo" width="1120" />
 </p>
 
 ## 它主要解决什么问题
