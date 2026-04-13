@@ -2,37 +2,37 @@
   "schemaVersion": 1,
   "channel": "stable",
   "release": {
-    "version": "1.1.7",
-    "publishedAt": "2026-04-11T08:50:49Z",
-    "summary": "延续聚合模式下的原生 fast tier 语义，补齐 service_tier 透传与同额度优先更早重置排序，并修正 OpenAI Accounts 头部对齐；当前仍处于引导下载/安装模式，不宣称自动替换闭环。",
-    "releaseNotesURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.7",
-    "downloadPageURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.7",
+    "version": "1.1.8",
+    "publishedAt": "2026-04-13T07:21:52Z",
+    "summary": "修正 Plus / Team 双窗口额度的恢复时间语义：7 天额度耗尽时优先显示 7d 重置时间，多个 exhausted window 时显示真正决定恢复可用性的更晚窗口，并同步修正 exhausted 账号排序；README 中英双语截图与界面说明同步更新。",
+    "releaseNotesURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.8",
+    "downloadPageURL": "https://github.com/lizhelang/codexbar/releases/tag/v1.1.8",
     "deliveryMode": "guidedDownload",
     "minimumAutomaticUpdateVersion": "1.1.6",
     "artifacts": [
       {
         "architecture": "universal",
         "format": "dmg",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS.dmg",
-        "sha256": "e493e529b8c55765a22572830bd0e51228024f2a49d2f911fb5d94c767b0cd63"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.8/codexbar-1.1.8-macOS.dmg",
+        "sha256": "27f98b380969f281d1157d6a2a03a38a98567a45a6862848ca74659691ab1028"
       },
       {
         "architecture": "universal",
         "format": "zip",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS.zip",
-        "sha256": "c40179352f2c69f79418715fb258ca7f49cdce2b49d7c468e20ae6c0e30b4fad"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.8/codexbar-1.1.8-macOS.zip",
+        "sha256": "1b411e51faf9f3eb235a7326771a8f04a278525a74551c5e54d6efebf1a7fe81"
       },
       {
         "architecture": "x86_64",
         "format": "dmg",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS-intel.dmg",
-        "sha256": "f30cc37c82d4495c7190ebdd139da7a488550d3475c47ba1550db295397da1dd"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.8/codexbar-1.1.8-macOS-intel.dmg",
+        "sha256": "d31a61dd2b75cc3ae6320546e7e69b3d4c71867deef2745ffed7ab6179851843"
       },
       {
         "architecture": "x86_64",
         "format": "zip",
-        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.7/codexbar-1.1.7-macOS-intel.zip",
-        "sha256": "ffd509b9e24808f46e090b7d523320a83afb6333ab772fc6a939733c7c7d0110"
+        "downloadURL": "https://github.com/lizhelang/codexbar/releases/download/v1.1.8/codexbar-1.1.8-macOS-intel.zip",
+        "sha256": "d1361c8ebed4365c7156ef4f9a9d9d091d374c90e604db321c47b570c8cbc922"
       }
     ]
   }
