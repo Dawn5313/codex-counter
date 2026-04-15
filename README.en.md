@@ -88,6 +88,12 @@ That is the main value of the app: switching account or provider does not mean s
 - Multiple OpenAI-compatible providers
 - Multiple API-key accounts under the same provider
 - Fast switching from the menu bar
+- Dual OpenAI account modes: **manual switch / aggregate gateway**
+- OpenAI account CSV import / export
+- OpenAI account ordering: quota-weighted or manual order
+- Settings for manual activation behavior and preferred Codex.app path
+- Local usage and cost estimates
+- Version detection driven by a single update feed plus a manual "Check for Updates" entry
 
 ## Downloads
 
@@ -95,12 +101,6 @@ This repository already includes direct-download macOS installables:
 
 - [ccodexr-1.2.0-macOS.dmg](./dist/v1.2.0/ccodexr-1.2.0-macOS.dmg)
 - [ccodexr-1.2.0-macOS.zip](./dist/v1.2.0/ccodexr-1.2.0-macOS.zip)
-- Dual OpenAI account modes: **manual switch / aggregate gateway**
-- OpenAI account CSV import / export
-- OpenAI account ordering: quota-weighted or manual order
-- Settings for manual activation behavior and preferred Codex.app path
-- Local usage and cost estimates
-- Version detection driven by a single update feed plus a manual "Check for Updates" entry
 
 Local usage and cost estimates are derived from:
 
