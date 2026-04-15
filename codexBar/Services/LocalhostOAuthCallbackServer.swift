@@ -21,7 +21,7 @@ final class LocalhostOAuthCallbackServer {
     let port: UInt16
     let callbackPath: String
 
-    private let queue = DispatchQueue(label: "lzl.codexbar.oauth-callback-server")
+    private let queue = DispatchQueue(label: "com.dawn5313.ccodexr.oauth-callback-server")
     private let onCallback: @MainActor (String) -> Void
 
     private var isRunning = false

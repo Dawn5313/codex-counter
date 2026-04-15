@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Render a canonical codexbar update feed from a JSON manifest."""
+"""Render a canonical ccodexr update feed from a JSON manifest."""
 
 from __future__ import annotations
 
@@ -55,7 +55,7 @@ def normalize_manifest(manifest: dict[str, Any], base_directory: Path) -> dict[s
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Normalize codexbar release-feed JSON and compute sha256 from localPath when available."
+        description="Normalize ccodexr release-feed JSON and compute sha256 from localPath when available."
     )
     parser.add_argument("input", help="input manifest JSON path")
     parser.add_argument("output", help="output feed JSON path")

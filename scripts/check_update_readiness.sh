@@ -1,7 +1,7 @@
 #!/bin/zsh
 set -euo pipefail
 
-app_path="${1:-/Applications/codexbar.app}"
+app_path="${1:-/Applications/ccodexr.app}"
 home_apps="${HOME}/Applications"
 
 if [[ ! -d "${app_path}" ]]; then
@@ -27,9 +27,9 @@ echo "===== spctl ====="
 spctl -a -vv "${app_path}" 2>&1 || true
 echo
 echo "===== mdfind ====="
-mdfind "codexbar.app" || true
+mdfind "ccodexr.app" || true
 echo
 echo "===== lsregister ====="
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -dump \
-  | rg -n "codexbar\\.app|lzhl\\.codexAppBar|Identifier=codexbar" \
+  | rg -n "ccodexr\\.app|com\\.dawn5313\\.ccodexr|Identifier=ccodexr" \
   | head -n 120 || true

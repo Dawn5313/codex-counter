@@ -199,7 +199,7 @@ struct OpenAIOAuthFlowService {
         if let returnedState = parsed.state,
            returnedState != flow.expectedState {
             NSLog(
-                "codexbar OAuth state mismatch on completion: expected=%@ returned=%@; attempting PKCE exchange anyway",
+                "ccodexr OAuth state mismatch on completion: expected=%@ returned=%@; attempting PKCE exchange anyway",
                 flow.expectedState,
                 returnedState
             )

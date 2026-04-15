@@ -306,7 +306,7 @@ final class OpenAIAccountGatewayServiceTests: CodexBarTestCase {
         )
         XCTAssertEqual(
             observed.3,
-            ["codexbar", "codexbar", "codexbar"]
+            ["ccodexr", "ccodexr", "ccodexr"]
         )
         XCTAssertEqual(service.currentRoutedAccountIDForTesting(), "acct-beta")
 
@@ -451,7 +451,7 @@ final class OpenAIAccountGatewayServiceTests: CodexBarTestCase {
         )
         XCTAssertEqual(
             observed.3,
-            ["codexbar", "codexbar", "codexbar"]
+            ["ccodexr", "ccodexr", "ccodexr"]
         )
         XCTAssertEqual(service.currentRoutedAccountIDForTesting(), "acct-beta")
 

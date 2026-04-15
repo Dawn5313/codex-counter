@@ -243,7 +243,7 @@ final class UpdateCoordinatorTests: XCTestCase {
             ),
             environment: MockUpdateEnvironment(
                 currentVersion: "1.1.5",
-                bundleURL: URL(fileURLWithPath: "/Applications/codexbar.app"),
+                bundleURL: URL(fileURLWithPath: "/Applications/ccodexr.app"),
                 architecture: .arm64
             )
         )
@@ -289,7 +289,7 @@ final class UpdateCoordinatorTests: XCTestCase {
             ),
             environment: MockUpdateEnvironment(
                 currentVersion: "1.1.5",
-                bundleURL: URL(fileURLWithPath: "/Applications/codexbar.app"),
+                bundleURL: URL(fileURLWithPath: "/Applications/ccodexr.app"),
                 architecture: .arm64
             )
         )
@@ -350,7 +350,7 @@ private final class MockFeedLoader: AppUpdateFeedLoading {
 
 private struct MockUpdateEnvironment: AppUpdateEnvironmentProviding {
     var currentVersion: String
-    var bundleURL: URL = URL(fileURLWithPath: "/Applications/codexbar.app")
+    var bundleURL: URL = URL(fileURLWithPath: "/Applications/ccodexr.app")
     var architecture: UpdateArtifactArchitecture
     var feedURL: URL? = URL(string: "https://example.com/stable.json")
 }

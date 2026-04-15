@@ -9,11 +9,11 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.codexbar.oauth</string>
+				<string>com.dawn5313.ccodexr.oauth</string>
 			</array>
 		</dict>
 	</array>
 	<key>CodexBarUpdateFeedURL</key>
-	<string>https://raw.githubusercontent.com/lizhelang/codexbar/main/release-feed/stable.json</string>
+	<string>https://raw.githubusercontent.com/Dawn5313/codex-counter/main/release-feed/stable.json</string>
 </dict>
 </plist>

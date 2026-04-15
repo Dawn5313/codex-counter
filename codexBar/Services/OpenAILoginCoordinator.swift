@@ -3,8 +3,8 @@ import Foundation
 import SwiftUI
 
 extension Notification.Name {
-    static let openAILoginDidSucceed = Notification.Name("lzl.codexbar.openai-login.did-succeed")
-    static let openAILoginDidFail = Notification.Name("lzl.codexbar.openai-login.did-fail")
+    static let openAILoginDidSucceed = Notification.Name("com.dawn5313.ccodexr.openai-login.did-succeed")
+    static let openAILoginDidFail = Notification.Name("com.dawn5313.ccodexr.openai-login.did-fail")
 }
 
 private struct OpenAILoginWindowView: View {
@@ -39,7 +39,7 @@ final class OpenAILoginCoordinator {
     static let shared = OpenAILoginCoordinator()
 
     static let windowID = "oauth-login"
-    static let loginURLScheme = "com.codexbar.oauth"
+    static let loginURLScheme = "com.dawn5313.ccodexr.oauth"
     static let loginHost = "login"
 
     private var callbackServer: LocalhostOAuthCallbackServer?
@@ -111,7 +111,7 @@ final class OpenAILoginCoordinator {
             try server.start()
             self.callbackServer = server
         } catch {
-            NSLog("codexbar localhost OAuth callback listener unavailable: %@", error.localizedDescription)
+            NSLog("ccodexr localhost OAuth callback listener unavailable: %@", error.localizedDescription)
             self.callbackServer = nil
         }
     }

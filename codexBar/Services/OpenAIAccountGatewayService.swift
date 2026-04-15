@@ -4,7 +4,7 @@ import Network
 
 extension Notification.Name {
     static let openAIAccountGatewayDidRouteAccount = Notification.Name(
-        "lzl.codexbar.openai-gateway.did-route-account"
+        "com.dawn5313.ccodexr.openai-gateway.did-route-account"
     )
 }
 
@@ -22,8 +22,8 @@ protocol OpenAIAccountGatewayControlling: AnyObject {
 enum OpenAIAccountGatewayConfiguration {
     static let host = "localhost"
     static let port: UInt16 = 1456
-    static let apiKey = "codexbar-local-gateway"
-    static let originator = "codexbar"
+    static let apiKey = "ccodexr-local-gateway"
+    static let originator = "ccodexr"
     static let reasoningIncludeMarker = "reasoning.encrypted_content"
     static let upstreamResponsesURL = URL(string: "https://chatgpt.com/backend-api/codex/responses")!
     static let upstreamResponsesCompactURL = URL(string: "https://chatgpt.com/backend-api/codex/responses/compact")!
@@ -104,10 +104,10 @@ private enum OpenAIAccountGatewayResponsesRoute {
 
 final class OpenAIAccountGatewayService: OpenAIAccountGatewayControlling {
     static let shared = OpenAIAccountGatewayService()
-    nonisolated static let mockRequestBodyPropertyKey = "codexbar.mockRequestBody"
+    nonisolated static let mockRequestBodyPropertyKey = "ccodexr.mockRequestBody"
 
-    private let listenerQueue = DispatchQueue(label: "lzl.codexbar.openai-gateway.listener")
-    private let stateQueue = DispatchQueue(label: "lzl.codexbar.openai-gateway.state")
+    private let listenerQueue = DispatchQueue(label: "com.dawn5313.ccodexr.openai-gateway.listener")
+    private let stateQueue = DispatchQueue(label: "com.dawn5313.ccodexr.openai-gateway.state")
     private let urlSession: URLSession
     private let runtimeConfiguration: OpenAIAccountGatewayRuntimeConfiguration
     private let routeJournalStore: OpenAIAggregateRouteJournalStoring
@@ -151,7 +151,7 @@ final class OpenAIAccountGatewayService: OpenAIAccountGatewayControlling {
                 self.listener = listener
                 listener.start(queue: self.listenerQueue)
             } catch {
-                NSLog("codexbar OpenAI gateway failed to start: %@", error.localizedDescription)
+                NSLog("ccodexr OpenAI gateway failed to start: %@", error.localizedDescription)
             }
         }
     }
@@ -193,7 +193,7 @@ final class OpenAIAccountGatewayService: OpenAIAccountGatewayControlling {
             guard let self else { return }
 
             if let error {
-                NSLog("codexbar OpenAI gateway receive failed: %@", error.localizedDescription)
+                NSLog("ccodexr OpenAI gateway receive failed: %@", error.localizedDescription)
                 connection.cancel()
                 return
             }
@@ -462,7 +462,7 @@ final class OpenAIAccountGatewayService: OpenAIAccountGatewayControlling {
                     self.sendJSONResponse(
                         on: connection,
                         statusCode: 502,
-                        body: #"{"error":{"message":"codexbar gateway failed to reach OpenAI upstream"}}"#
+                        body: #"{"error":{"message":"ccodexr gateway failed to reach OpenAI upstream"}}"#
                     )
                 }
             }
@@ -778,7 +778,7 @@ final class OpenAIAccountGatewayService: OpenAIAccountGatewayControlling {
                     upstreamTask.cancel(with: .goingAway, reason: nil)
                     self.clearBinding(stickyKey: stickyKey, accountID: accountID)
                     connection.cancel()
-                    NSLog("codexbar websocket receive failed: %@", error.localizedDescription)
+                    NSLog("ccodexr websocket receive failed: %@", error.localizedDescription)
                     return
                 }
 
@@ -1186,7 +1186,7 @@ extension OpenAIAccountGatewayService {
                     return OpenAIAccountGatewayTestResponse(
                         statusCode: 502,
                         headers: ["Content-Type": "application/json"],
-                        body: Data(#"{"error":{"message":"codexbar gateway failed to reach OpenAI upstream"}}"#.utf8)
+                        body: Data(#"{"error":{"message":"ccodexr gateway failed to reach OpenAI upstream"}}"#.utf8)
                     )
                 }
             }
@@ -1195,7 +1195,7 @@ extension OpenAIAccountGatewayService {
         return OpenAIAccountGatewayTestResponse(
             statusCode: 502,
             headers: ["Content-Type": "application/json"],
-            body: Data(#"{"error":{"message":"codexbar gateway failed to reach OpenAI upstream"}}"#.utf8)
+            body: Data(#"{"error":{"message":"ccodexr gateway failed to reach OpenAI upstream"}}"#.utf8)
         )
     }
 

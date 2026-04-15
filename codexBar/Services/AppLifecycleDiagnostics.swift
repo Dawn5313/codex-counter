@@ -13,7 +13,7 @@ private struct AppSessionState: Codable {
 final class AppLifecycleDiagnostics {
     static let shared = AppLifecycleDiagnostics()
 
-    private let queue = DispatchQueue(label: "lzl.codexbar.lifecycle-diagnostics")
+    private let queue = DispatchQueue(label: "com.dawn5313.ccodexr.lifecycle-diagnostics")
     private let stateURL = CodexPaths.codexBarRoot.appendingPathComponent("app-lifecycle-state.json")
     private let eventsURL = CodexPaths.codexBarRoot.appendingPathComponent("app-lifecycle.jsonl")
 

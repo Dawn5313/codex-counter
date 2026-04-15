@@ -41,7 +41,7 @@ enum CodexPaths {
     }
     static var oauthFlowsDirectoryURL: URL { self.codexBarRoot.appendingPathComponent("oauth-flows", isDirectory: true) }
     static var menuHostRootURL: URL { self.codexBarRoot.appendingPathComponent("menu-host", isDirectory: true) }
-    static var menuHostAppURL: URL { self.menuHostRootURL.appendingPathComponent("codexbar.app", isDirectory: true) }
+    static var menuHostAppURL: URL { self.menuHostRootURL.appendingPathComponent("ccodexr.app", isDirectory: true) }
 
     static var barConfigURL: URL { self.codexBarRoot.appendingPathComponent("config.json") }
     static var costCacheURL: URL { self.codexBarRoot.appendingPathComponent("cost-cache.json") }

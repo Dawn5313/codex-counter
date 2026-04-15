@@ -1,8 +1,8 @@
-# codexbar
+# ccodexr
 
 让 Codex Desktop 在多账号 / 多 provider 切换时，尽量不丢掉原本的上下文和历史会话。
 
-`codexbar` 是一个面向 macOS 的菜单栏工具。它解决的不是“再建一套 Codex”，而是一个更具体的问题：
+`ccodexr` 是一个面向 macOS 的菜单栏工具，由 [Dawn5313](https://github.com/Dawn5313) 维护。它解决的不是“再建一套 Codex”，而是一个更具体的问题：
 
 > 切账号、切 provider 之后，你想继续共用同一个 `~/.codex` 历史池，而不是把上下文和 session 拆散。
 
@@ -24,7 +24,7 @@
 可以直接看到当前模式、账号套餐、5 小时 / 7 天两层额度，以及“真正决定恢复可用性”的重置时间。
 
 <p align="center">
-  <img src="./docs/assets/readme-openai-accounts-demo.png" alt="codexbar OpenAI accounts demo" width="760" />
+  <img src="./docs/assets/readme-openai-accounts-demo.png" alt="ccodexr OpenAI accounts demo" width="760" />
 </p>
 
 ### 2. Provider 管理
@@ -32,7 +32,7 @@
 同一菜单里可以展开多个 OpenAI 兼容 provider，并在每个 provider 下维护多组 API key 账号。
 
 <p align="center">
-  <img src="./docs/assets/readme-providers-demo.png" alt="codexbar providers demo" width="760" />
+  <img src="./docs/assets/readme-providers-demo.png" alt="ccodexr providers demo" width="760" />
 </p>
 
 ### 3. 设置页
@@ -40,7 +40,7 @@
 设置页把账户模式、手动激活行为、Codex Desktop 路径、排序规则和更新检查整合在一个独立窗口里，不需要再手改配置文件。
 
 <p align="center">
-  <img src="./docs/assets/readme-settings-accounts-demo.png" alt="codexbar settings demo" width="1120" />
+  <img src="./docs/assets/readme-settings-accounts-demo.png" alt="ccodexr settings demo" width="1120" />
 </p>
 
 ## 它主要解决什么问题
@@ -51,7 +51,7 @@
 - 历史 session 还在磁盘里，却因为切账号 / 切 provider 变得不连贯
 - 反复手改配置文件很烦，恢复现场也麻烦
 
-`codexbar` 想解决的，就是这件事。
+`ccodexr` 想解决的，就是这件事。
 
 ## 不拆 `~/.codex`，保留同一个会话池
 
@@ -61,7 +61,7 @@
 - 切换之后很容易觉得“上下文没了”
 - 需要在不同账号环境之间来回找 session
 
-`codexbar` 选的是另一条路：
+`ccodexr` 选的是另一条路：
 
 - 仍然只保留一个 `~/.codex`
 - 保留 `~/.codex/sessions` 和 `~/.codex/archived_sessions` 这一套共享历史池
@@ -105,7 +105,7 @@
 但要特别说明当前边界：
 
 - 当前稳定版本默认仍是 **guided download / install**
-- 这表示发现新版本后，codexbar 会在菜单和更新状态里显示可用版本，由你继续打开匹配 Apple Silicon / Intel 的安装包下载链接
+- 这表示发现新版本后，ccodexr 会在菜单和更新状态里显示可用版本，由你继续打开匹配 Apple Silicon / Intel 的安装包下载链接
 - 当前版本**不会假装**已经支持自动替换旧 app 并自动重启
 - `1.1.5 -> 首个支持 updater 的版本` 仍要求人工安装 bootstrap
 - 真正自动更新闭环只会从“首个支持 updater 的版本 -> 下一版本”开始验证
@@ -116,7 +116,7 @@
 
 ## 适合哪些用户
 
-如果你符合下面这些情况，`codexbar` 会比较有用：
+如果你符合下面这些情况，`ccodexr` 会比较有用：
 
 - 你会同时使用 OpenAI 官方账号和第三方 OpenAI 兼容 provider
 - 你同一个 provider 下会维护多组 API key
@@ -129,8 +129,8 @@
 
 1. 点击登录按钮
 2. 在浏览器里完成授权
-3. 当浏览器跳到 `http://localhost:1455/auth/callback?...` 时，codexbar 会自动捕获回调
-4. codexbar 直接完成 token 交换并导入账号
+3. 当浏览器跳到 `http://localhost:1455/auth/callback?...` 时，ccodexr 会自动捕获回调
+4. ccodexr 直接完成 token 交换并导入账号
 
 如果自动捕获失败，仍然可以把完整回调 URL 或单独的 `code` 手工粘贴回窗口。
 
@@ -166,15 +166,15 @@
 ## 本地构建
 
 ```sh
-git clone https://github.com/lizhelang/codexbar.git
-cd codexbar
+git clone https://github.com/Dawn5313/codex-counter.git
+cd codex-counter
 open codexbar.xcodeproj
 ```
 
 然后：
 
 1. 在 Xcode 里选择自己的签名团队
-2. 构建并运行 `codexbar` target
+2. 构建并运行 `ccodexr` target
 
 ## 致谢
 

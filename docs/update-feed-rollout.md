@@ -1,4 +1,4 @@
-# codexbar 更新 feed 与 rollout 约定
+# ccodexr 更新 feed 与 rollout 约定
 
 ## 当前状态
 
@@ -16,7 +16,7 @@
 
 Phase 0 gate 的本地证据表明当前还不满足成熟 macOS updater 的前置条件：
 
-- `/Applications/codexbar.app` 当前是 `adhoc` 签名，`spctl` 显示 `source=no usable signature`
+- `/Applications/ccodexr.app` 当前是 `adhoc` 签名，`spctl` 显示 `source=no usable signature`
 - 仓库里还没有成熟 updater 引擎接入
 - 仓库里还没有正式 feed 签名/发布流水线
 - Bootstrap / Rollout Gate 仍要求：`1.1.5 -> 首个支持 updater 的版本` 必须人工安装进入
@@ -69,9 +69,9 @@ python3 scripts/generate_update_feed.py release-feed/stable.json release-feed/st
 在把 `deliveryMode` 从 `guidedDownload` 切到 `automatic` 之前，先运行：
 
 ```sh
-scripts/check_update_readiness.sh /Applications/codexbar.app
-scripts/check_update_readiness.sh "$HOME/Applications/codexbar.app"
-scripts/check_update_readiness.sh "/private/tmp/codexbar-phase0/codexbar.app"
+scripts/check_update_readiness.sh /Applications/ccodexr.app
+scripts/check_update_readiness.sh "$HOME/Applications/ccodexr.app"
+scripts/check_update_readiness.sh "/private/tmp/ccodexr-phase0/ccodexr.app"
 ```
 
 至少要核对：
@@ -80,7 +80,7 @@ scripts/check_update_readiness.sh "/private/tmp/codexbar-phase0/codexbar.app"
 - `~/Applications`
 - 非标准路径
 - 签名 / 公证 / 权限 / 重启时序
-- `mdfind` / `lsregister` 不留下多个 `codexbar.app`
+- `mdfind` / `lsregister` 不留下多个 `ccodexr.app`
 
 ## 切到 automatic 的前置条件
 

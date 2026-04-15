@@ -2,7 +2,7 @@ import Foundation
 
 /// Bilingual string helper — detects system language at runtime, with user override.
 enum L {
-    private nonisolated static let sharedDefaultsSuite = "lzhl.codexAppBar"
+    private nonisolated static let sharedDefaultsSuite = "com.dawn5313.ccodexr"
 
     private nonisolated static var sharedDefaults: UserDefaults? {
         UserDefaults(suiteName: self.sharedDefaultsSuite)

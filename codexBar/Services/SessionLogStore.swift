@@ -82,7 +82,7 @@ final class SessionLogStore {
     private let fileManager: FileManager
     private let codexRootURL: URL
     private let persistedCacheURL: URL
-    private let queue = DispatchQueue(label: "lzl.codexbar.session-log-store", qos: .utility)
+    private let queue = DispatchQueue(label: "com.dawn5313.ccodexr.session-log-store", qos: .utility)
     private let persistedCacheVersion = 4
 
     private var sessionCache: [URL: CachedSessionRecord] = [:]

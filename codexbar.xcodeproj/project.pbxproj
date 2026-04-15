@@ -7,8 +7,8 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		C0C16B462F7423BE00A2A16F /* codexbar.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = codexbar.app; sourceTree = BUILT_PRODUCTS_DIR; };
-			C0C16B6B2F7428A100A2A16F /* codexbarTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = codexbarTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0C16B462F7423BE00A2A16F /* ccodexr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ccodexr.app; sourceTree = BUILT_PRODUCTS_DIR; };
+			C0C16B6B2F7428A100A2A16F /* ccodexrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ccodexrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -84,8 +84,8 @@
 			C0C16B472F7423BE00A2A16F /* Products */ = {
 				isa = PBXGroup;
 				children = (
-					C0C16B462F7423BE00A2A16F /* codexbar.app */,
-					C0C16B6B2F7428A100A2A16F /* codexbarTests.xctest */,
+					C0C16B462F7423BE00A2A16F /* ccodexr.app */,
+					C0C16B6B2F7428A100A2A16F /* ccodexrTests.xctest */,
 				);
 				name = Products;
 			sourceTree = "<group>";
@@ -93,7 +93,7 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-			C0C16B452F7423BE00A2A16F /* codexbar */ = {
+			C0C16B452F7423BE00A2A16F /* ccodexr */ = {
 				isa = PBXNativeTarget;
 				buildConfigurationList = C0C16B512F7423BF00A2A16F /* Build configuration list for PBXNativeTarget "codexbar" */;
 				buildPhases = (
@@ -108,14 +108,14 @@
 				fileSystemSynchronizedGroups = (
 					C0C16B482F7423BE00A2A16F /* codexBar */,
 				);
-			name = codexbar;
+			name = ccodexr;
 			packageProductDependencies = (
 			);
-			productName = codexbar;
-			productReference = C0C16B462F7423BE00A2A16F /* codexbar.app */;
+			productName = ccodexr;
+			productReference = C0C16B462F7423BE00A2A16F /* ccodexr.app */;
 			productType = "com.apple.product-type.application";
 		};
-			C0C16B782F7428A100A2A16F /* codexbarTests */ = {
+			C0C16B782F7428A100A2A16F /* ccodexrTests */ = {
 				isa = PBXNativeTarget;
 				buildConfigurationList = C0C16B832F7428A100A2A16F /* Build configuration list for PBXNativeTarget "codexbarTests" */;
 			buildPhases = (
@@ -131,11 +131,11 @@
 					C0C16B482F7423BE00A2A16F /* codexBar */,
 					C0C16B6F2F7428A100A2A16F /* codexBarTests */,
 				);
-				name = codexbarTests;
+				name = ccodexrTests;
 			packageProductDependencies = (
 			);
-			productName = codexbarTests;
-			productReference = C0C16B6B2F7428A100A2A16F /* codexbarTests.xctest */;
+			productName = ccodexrTests;
+			productReference = C0C16B6B2F7428A100A2A16F /* ccodexrTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -170,8 +170,8 @@
 			projectDirPath = "";
 				projectRoot = "";
 				targets = (
-					C0C16B452F7423BE00A2A16F /* codexbar */,
-					C0C16B782F7428A100A2A16F /* codexbarTests */,
+					C0C16B452F7423BE00A2A16F /* ccodexr */,
+					C0C16B782F7428A100A2A16F /* ccodexrTests */,
 				);
 			};
 /* End PBXProject section */
@@ -333,15 +333,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 8;
-				DEVELOPMENT_TEAM = MLR4HT4UC8;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = codexBar/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = codexbar;
-				INFOPLIST_KEY_CFBundleName = codexbar;
+				INFOPLIST_KEY_CFBundleDisplayName = ccodexr;
+				INFOPLIST_KEY_CFBundleName = ccodexr;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -351,8 +350,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
 				MARKETING_VERSION = 1.1.8;
-				PRODUCT_BUNDLE_IDENTIFIER = lzhl.codexAppBar;
-				PRODUCT_NAME = codexbar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dawn5313.ccodexr;
+				PRODUCT_NAME = ccodexr;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -372,15 +371,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 8;
-				DEVELOPMENT_TEAM = MLR4HT4UC8;
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = codexBar/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = codexbar;
-				INFOPLIST_KEY_CFBundleName = codexbar;
+				INFOPLIST_KEY_CFBundleDisplayName = ccodexr;
+				INFOPLIST_KEY_CFBundleName = ccodexr;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
 				INFOPLIST_KEY_LSUIElement = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -390,8 +388,8 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
 				MARKETING_VERSION = 1.1.8;
-				PRODUCT_BUNDLE_IDENTIFIER = lzhl.codexAppBar;
-				PRODUCT_NAME = codexbar;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dawn5313.ccodexr;
+				PRODUCT_NAME = ccodexr;
 				REGISTER_APP_GROUPS = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
@@ -410,8 +408,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				PRODUCT_BUNDLE_IDENTIFIER = lzhl.codexbar.tests;
-				PRODUCT_NAME = codexbarTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dawn5313.ccodexr.tests;
+				PRODUCT_NAME = ccodexrTests;
 				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_VERSION = 5.0;
@@ -426,8 +424,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
-				PRODUCT_BUNDLE_IDENTIFIER = lzhl.codexbar.tests;
-				PRODUCT_NAME = codexbarTests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dawn5313.ccodexr.tests;
+				PRODUCT_NAME = ccodexrTests;
 				SKIP_INSTALL = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_VERSION = 5.0;

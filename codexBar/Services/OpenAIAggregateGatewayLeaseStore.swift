@@ -76,7 +76,7 @@ private struct OpenAIAggregateRouteJournalSnapshot: Codable, Equatable {
 final class OpenAIAggregateRouteJournalStore: OpenAIAggregateRouteJournalStoring {
     private let fileURL: URL
     private let fileManager: FileManager
-    private let queue = DispatchQueue(label: "lzl.codexbar.openai-gateway.route-journal")
+    private let queue = DispatchQueue(label: "com.dawn5313.ccodexr.openai-gateway.route-journal")
 
     init(
         fileURL: URL = CodexPaths.openAIGatewayRouteJournalURL,

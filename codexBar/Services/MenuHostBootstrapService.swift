@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 
 enum CodexBarInterprocess {
-    static let reloadStateNotification = Notification.Name("lzl.codexbar.reload-state")
-    static let terminatePrimaryNotification = Notification.Name("lzl.codexbar.terminate-primary")
+    static let reloadStateNotification = Notification.Name("com.dawn5313.ccodexr.reload-state")
+    static let terminatePrimaryNotification = Notification.Name("com.dawn5313.ccodexr.terminate-primary")
 
     static func postReloadState() {
         DistributedNotificationCenter.default().post(
@@ -24,7 +24,7 @@ enum CodexBarInterprocess {
 final class MenuHostBootstrapService {
     static let shared = MenuHostBootstrapService()
 
-    static let helperBundleIdentifier = "lzhl.codexAppBar.menuhost"
+    static let helperBundleIdentifier = "com.dawn5313.ccodexr.menuhost"
     static let helperMarkerInfoKey = "CodexBarMenuHost"
     static let helperSourceVersionKey = "CodexBarMenuHostSourceVersion"
 
@@ -48,7 +48,7 @@ final class MenuHostBootstrapService {
                 try self.launchHelper(at: helperURL)
             }
         } catch {
-            NSLog("codexbar menu host bootstrap failed: %@", error.localizedDescription)
+            NSLog("ccodexr menu host bootstrap failed: %@", error.localizedDescription)
         }
     }
 
@@ -104,12 +104,12 @@ final class MenuHostBootstrapService {
             options: [],
             format: nil
         ) as? [String: Any] else {
-            throw NSError(domain: "codexbar.helper", code: 1)
+            throw NSError(domain: "ccodexr.helper", code: 1)
         }
 
         plist["CFBundleIdentifier"] = Self.helperBundleIdentifier
-        plist["CFBundleDisplayName"] = "codexbar"
-        plist["CFBundleName"] = "codexbar"
+        plist["CFBundleDisplayName"] = "ccodexr"
+        plist["CFBundleName"] = "ccodexr"
         plist[Self.helperMarkerInfoKey] = true
         plist[Self.helperSourceVersionKey] = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleVersion"
@@ -136,7 +136,7 @@ final class MenuHostBootstrapService {
         configuration.createsNewApplicationInstance = false
         NSWorkspace.shared.openApplication(at: helperURL, configuration: configuration) { _, error in
             if let error {
-                NSLog("codexbar failed to launch menu host: %@", error.localizedDescription)
+                NSLog("ccodexr failed to launch menu host: %@", error.localizedDescription)
             }
         }
     }

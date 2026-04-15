@@ -1,8 +1,8 @@
-# codexbar
+# ccodexr
 
 Keep Codex Desktop context and session history in one shared pool when switching between multiple accounts or providers.
 
-`codexbar` is a macOS menu bar utility for Codex Desktop users. It is not trying to replace Codex itself. It focuses on one practical problem:
+`ccodexr` is a macOS menu bar utility for Codex Desktop users, maintained by [Dawn5313](https://github.com/Dawn5313). It is not trying to replace Codex itself. It focuses on one practical problem:
 
 > after switching accounts or providers, you still want to keep using the same `~/.codex` history pool instead of splitting sessions and context across multiple homes.
 
@@ -26,7 +26,7 @@ The screenshots below are **privacy-safe demo renders maintained in this reposit
 The main menu shows the current mode, plan badge, dual 5-hour / 7-day windows, and the reset timer that actually determines when an exhausted account becomes usable again.
 
 <p align="center">
-  <img src="./docs/assets/readme-openai-accounts-demo.png" alt="codexbar OpenAI accounts demo" width="760" />
+  <img src="./docs/assets/readme-openai-accounts-demo.png" alt="ccodexr OpenAI accounts demo" width="760" />
 </p>
 
 ### 2. Provider Management
@@ -34,7 +34,7 @@ The main menu shows the current mode, plan badge, dual 5-hour / 7-day windows, a
 The provider section expands inline, so you can keep multiple OpenAI-compatible backends and multiple API-key accounts under each backend without leaving the menu bar workflow.
 
 <p align="center">
-  <img src="./docs/assets/readme-providers-demo.png" alt="codexbar providers demo" width="760" />
+  <img src="./docs/assets/readme-providers-demo.png" alt="ccodexr providers demo" width="760" />
 </p>
 
 ### 3. Settings Window
@@ -42,7 +42,7 @@ The provider section expands inline, so you can keep multiple OpenAI-compatible 
 The settings window consolidates account mode, manual activation behavior, preferred Codex Desktop path, ordering rules, and update controls into one dedicated surface.
 
 <p align="center">
-  <img src="./docs/assets/readme-settings-accounts-demo.png" alt="codexbar settings demo" width="1120" />
+  <img src="./docs/assets/readme-settings-accounts-demo.png" alt="ccodexr settings demo" width="1120" />
 </p>
 
 ## Problem It Solves
@@ -53,7 +53,7 @@ If you frequently switch between multiple OpenAI accounts, relay services, or Op
 - session files still exist on disk, but history feels fragmented after switching
 - manually editing config files is tedious and error-prone
 
-`codexbar` is built to make that workflow less painful.
+`ccodexr` is built to make that workflow less painful.
 
 ## One Shared `~/.codex` Session Pool
 
@@ -63,7 +63,7 @@ Many multi-account workflows isolate each account by creating a separate `CODEX_
 - switching can feel like your previous context disappeared
 - finding the right session becomes harder
 
-`codexbar` takes the opposite approach:
+`ccodexr` takes the opposite approach:
 
 - keep a single `~/.codex`
 - preserve `~/.codex/sessions` and `~/.codex/archived_sessions` as one shared history pool
@@ -107,7 +107,7 @@ This repository now ships a single update feed. The app performs a non-blocking 
 The current boundary is intentionally narrow:
 
 - the stable feed is still in **guided download / install** mode
-- when a newer version exists, codexbar shows it in the menu/status UI so you can continue with the matching Apple Silicon / Intel installer asset
+- when a newer version exists, ccodexr shows it in the menu/status UI so you can continue with the matching Apple Silicon / Intel installer asset
 - the current build does **not** pretend that automatic app replacement and restart are already available
 - `1.1.5 -> the first updater-capable version` still requires a manual bootstrap install
 - the real automatic-update loop should only be validated from `the first updater-capable version -> the next version`
@@ -118,7 +118,7 @@ See also:
 
 ## Who This Is For
 
-`codexbar` is useful if:
+`ccodexr` is useful if:
 
 - you use both official OpenAI accounts and third-party OpenAI-compatible providers
 - you keep multiple API keys under the same provider
@@ -131,8 +131,8 @@ OpenAI login currently uses a browser-based authorization flow with localhost ca
 
 1. Click the login button
 2. Finish authorization in the browser
-3. When the browser reaches `http://localhost:1455/auth/callback?...`, codexbar captures the callback automatically
-4. codexbar completes token exchange and imports the account
+3. When the browser reaches `http://localhost:1455/auth/callback?...`, ccodexr captures the callback automatically
+4. ccodexr completes token exchange and imports the account
 
 If automatic capture fails, you can still paste the full callback URL or the raw `code` back into the window manually.
 
@@ -168,15 +168,15 @@ This repository does not bundle any private provider, API key, or personal accou
 ## Build Locally
 
 ```sh
-git clone https://github.com/lizhelang/codexbar.git
-cd codexbar
+git clone https://github.com/Dawn5313/codex-counter.git
+cd codex-counter
 open codexbar.xcodeproj
 ```
 
 Then:
 
 1. Select your signing team in Xcode
-2. Build and run the `codexbar` target
+2. Build and run the `ccodexr` target
 
 ## Acknowledgements
 

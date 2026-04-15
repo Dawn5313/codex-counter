@@ -144,11 +144,11 @@ struct CodexThreadRuntimeStore {
                 recentActivityWindow: sanitizedWindow
             )
         } catch let reason as UnavailableReason {
-            NSLog("codexbar running-thread runtime unavailable: %@", reason.diagnosticMessage)
+            NSLog("ccodexr running-thread runtime unavailable: %@", reason.diagnosticMessage)
             return .unavailable(reason, recentActivityWindow: sanitizedWindow)
         } catch {
             let reason = UnavailableReason.queryFailed(message: error.localizedDescription)
-            NSLog("codexbar running-thread runtime unavailable: %@", reason.diagnosticMessage)
+            NSLog("ccodexr running-thread runtime unavailable: %@", reason.diagnosticMessage)
             return .unavailable(reason, recentActivityWindow: sanitizedWindow)
         }
     }

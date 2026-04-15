@@ -56,8 +56,8 @@ final class TokenStore: ObservableObject {
     private let openAIAccountGatewayService: OpenAIAccountGatewayControlling
     private let aggregateGatewayLeaseStore: OpenAIAggregateGatewayLeaseStoring
     private let codexRunningProcessIDs: () -> Set<pid_t>
-    private let refreshStateQueue = DispatchQueue(label: "lzl.codexbar.refresh-state")
-    private let usageRefreshStateQueue = DispatchQueue(label: "lzl.codexbar.usage-refresh-state")
+    private let refreshStateQueue = DispatchQueue(label: "com.dawn5313.ccodexr.refresh-state")
+    private let usageRefreshStateQueue = DispatchQueue(label: "com.dawn5313.ccodexr.usage-refresh-state")
     private var isRefreshingLocalCostSummary = false
     private var isRefreshingAllUsage = false
     private var refreshingUsageAccountIDs: Set<String> = []

@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "C0C16B452F7423BE00A2A16F"
-               BuildableName = "codexbar.app"
-               BlueprintName = "codexbar"
+               BuildableName = "ccodexr.app"
+               BlueprintName = "ccodexr"
                ReferencedContainer = "container:codexbar.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -33,8 +33,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "C0C16B782F7428A100A2A16F"
-               BuildableName = "codexbarTests.xctest"
-               BlueprintName = "codexbarTests"
+               BuildableName = "ccodexrTests.xctest"
+               BlueprintName = "ccodexrTests"
                ReferencedContainer = "container:codexbar.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -55,8 +55,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C0C16B452F7423BE00A2A16F"
-            BuildableName = "codexbar.app"
-            BlueprintName = "codexbar"
+            BuildableName = "ccodexr.app"
+            BlueprintName = "ccodexr"
             ReferencedContainer = "container:codexbar.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -72,8 +72,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "C0C16B452F7423BE00A2A16F"
-            BuildableName = "codexbar.app"
-            BlueprintName = "codexbar"
+            BuildableName = "ccodexr.app"
+            BlueprintName = "ccodexr"
             ReferencedContainer = "container:codexbar.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
