@@ -93,6 +93,7 @@ final class TokenStore: ObservableObject {
 
         self.publishState()
         self.localCostSummary = self.loadCachedLocalCostSummary()
+        self.refreshLocalCostSummary()
         self.seedSwitchJournalIfNeeded()
         try? self.syncService.synchronize(config: self.config)
     }
@@ -123,6 +124,7 @@ final class TokenStore: ObservableObject {
             self.config = loaded
             self.publishState()
             self.localCostSummary = self.loadCachedLocalCostSummary()
+            self.refreshLocalCostSummary()
         }
     }
 

@@ -8,7 +8,10 @@ class WhamService {
 
     /// 查询单个账号的 wham usage
     func fetchUsage(account: TokenAccount) async throws -> WhamUsageResult {
-        var request = URLRequest(url: URL(string: baseURL)!)
+        guard let url = URL(string: baseURL) else {
+            throw WhamError.invalidResponse
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.timeoutInterval = 20
         request.setValue("Bearer \(account.accessToken)", forHTTPHeaderField: "Authorization")

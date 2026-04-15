@@ -263,6 +263,7 @@ struct MenuBarView: View {
     private let openAIAccountCSVPanelService = OpenAIAccountCSVPanelService()
     private let codexAppPathPanelService = CodexAppPathPanelService.shared
     private let codexDesktopLaunchProbeService = CodexDesktopLaunchProbeService()
+    private let codexThreadRuntimeStore = CodexThreadRuntimeStore.shared
 
     @State private var isRefreshing = false
     @State private var showError: String?
@@ -900,7 +901,7 @@ struct MenuBarView: View {
         let anchorFrame = window.convertToScreen(frameInWindow)
         let panelSize = CGSize(
             width: CostDetailsPanelView.panelWidth,
-            height: CostDetailsPanelView.panelHeight(hasHistory: !store.localCostSummary.dailyEntries.isEmpty)
+            height: CostDetailsPanelView.panelHeight(summary: store.localCostSummary)
         )
         let screen = NSScreen.screens.first { $0.frame.intersects(anchorFrame) } ?? NSScreen.main
         let visibleFrame = screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
@@ -913,7 +914,8 @@ struct MenuBarView: View {
         }
         originX = min(max(originX, visibleFrame.minX + margin), visibleFrame.maxX - panelSize.width - margin)
 
-        var originY = anchorFrame.maxY - panelSize.height
+        let topAlignmentInset: CGFloat = 10
+        var originY = window.frame.maxY - panelSize.height - topAlignmentInset
         originY = min(max(originY, visibleFrame.minY + margin), visibleFrame.maxY - panelSize.height - margin)
 
         DetachedWindowPresenter.shared.showHoverPanel(
@@ -1260,11 +1262,13 @@ struct MenuBarView: View {
         closeExistingCodexApps: Bool
     ) async throws {
         let previousActiveAccount = self.store.activeAccount()
+        let resumeThreadID = self.bestEffortContinuationThreadID()
         let existingCodexPIDs = Set(
             closeExistingCodexApps
                 ? self.codexDesktopLaunchProbeService.runningCodexApplications().map(\.processIdentifier)
                 : []
         )
+        var previousThreadLaunchConfiguration: CodexThreadRuntimeStore.ThreadLaunchConfiguration?
 
         do {
             try self.store.activate(
@@ -1275,17 +1279,25 @@ struct MenuBarView: View {
                 protectedByManualGrace: false
             )
 
-            let launchedApplication = try await self.codexDesktopLaunchProbeService.launchNewInstance()
+            previousThreadLaunchConfiguration = try self.prepareContinuationThreadForCurrentSelection(
+                threadID: resumeThreadID
+            )
+            let launchedApplication = try await self.codexDesktopLaunchProbeService.launchNewInstance(
+                resumeThreadID: resumeThreadID
+            )
             if closeExistingCodexApps {
                 var priorPIDs = existingCodexPIDs
                 if let launchedPID = launchedApplication?.processIdentifier {
                     priorPIDs.remove(launchedPID)
                 }
-                self.codexDesktopLaunchProbeService.terminateApplications(
+                await self.codexDesktopLaunchProbeService.terminateApplicationsAndWait(
                     withProcessIdentifiers: priorPIDs
                 )
             }
         } catch {
+            self.codexThreadRuntimeStore.restoreThreadLaunchConfigurationIfPossible(
+                previousThreadLaunchConfiguration
+            )
             if let previousActiveAccount,
                previousActiveAccount.accountId != account.accountId {
                 try? self.store.activate(previousActiveAccount)
@@ -1301,23 +1313,36 @@ struct MenuBarView: View {
     ) async throws {
         let previousProviderID = self.store.config.active.providerId
         let previousAccountID = self.store.config.active.accountId
+        let resumeThreadID = self.bestEffortContinuationThreadID()
         let existingCodexPIDs = Set(
             closeExistingCodexApps
                 ? self.codexDesktopLaunchProbeService.runningCodexApplications().map(\.processIdentifier)
                 : []
         )
+        var previousThreadLaunchConfiguration: CodexThreadRuntimeStore.ThreadLaunchConfiguration?
 
         do {
             try self.store.activateCustomProvider(providerID: providerID, accountID: accountID)
+            previousThreadLaunchConfiguration = try self.prepareContinuationThreadForCurrentSelection(
+                threadID: resumeThreadID
+            )
 
+            let launchedApplication = try await self.codexDesktopLaunchProbeService.launchNewInstance(
+                resumeThreadID: resumeThreadID
+            )
             if closeExistingCodexApps {
+                var priorPIDs = existingCodexPIDs
+                if let launchedPID = launchedApplication?.processIdentifier {
+                    priorPIDs.remove(launchedPID)
+                }
                 await self.codexDesktopLaunchProbeService.terminateApplicationsAndWait(
-                    withProcessIdentifiers: existingCodexPIDs
+                    withProcessIdentifiers: priorPIDs
                 )
             }
-
-            _ = try await self.codexDesktopLaunchProbeService.launchNewInstance()
         } catch {
+            self.codexThreadRuntimeStore.restoreThreadLaunchConfigurationIfPossible(
+                previousThreadLaunchConfiguration
+            )
             if previousProviderID != providerID || previousAccountID != accountID {
                 try? self.store.restoreActiveSelection(
                     providerID: previousProviderID,
@@ -1325,6 +1350,88 @@ struct MenuBarView: View {
                 )
             }
             throw error
+        }
+    }
+
+    private func bestEffortContinuationThreadID() -> String? {
+        guard let activeProvider = self.store.config.activeProvider() else { return nil }
+        let currentModelProvider = self.activeModelProviderKey(for: activeProvider)
+        let runtimeSnapshot = self.codexThreadRuntimeStore.loadRunningThreads(
+            now: Date(),
+            recentActivityWindow: 20
+        )
+
+        let matchingRunningThreads = runtimeSnapshot.threads.filter { thread in
+            self.codexThreadRuntimeStore.loadThreadLaunchConfiguration(threadID: thread.threadID)?.modelProvider == currentModelProvider
+        }
+
+        if let preferredRunningThread = matchingRunningThreads.first(where: { $0.source == "vscode" }) {
+            return preferredRunningThread.threadID
+        }
+        if let anyRunningThread = matchingRunningThreads.first {
+            return anyRunningThread.threadID
+        }
+
+        if let preferredRecentThread = self.codexThreadRuntimeStore.loadMostRecentThread(),
+           self.codexThreadRuntimeStore.loadThreadLaunchConfiguration(
+                threadID: preferredRecentThread.threadID
+           )?.modelProvider == currentModelProvider {
+            return preferredRecentThread.threadID
+        }
+
+        if let recentThread = self.codexThreadRuntimeStore.loadMostRecentThread(preferredSources: []),
+           self.codexThreadRuntimeStore.loadThreadLaunchConfiguration(
+                threadID: recentThread.threadID
+           )?.modelProvider == currentModelProvider {
+            return recentThread.threadID
+        }
+
+        return nil
+    }
+
+    private func prepareContinuationThreadForCurrentSelection(
+        threadID: String?
+    ) throws -> CodexThreadRuntimeStore.ThreadLaunchConfiguration? {
+        guard let threadID = threadID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              threadID.isEmpty == false,
+              let provider = self.store.config.activeProvider() else {
+            return nil
+        }
+
+        let targetModelProvider = self.activeModelProviderKey(for: provider)
+        let targetModel = self.store.config.global.defaultModel
+        let targetReasoningEffort = self.store.config.global.reasoningEffort
+
+        if let currentConfiguration = self.codexThreadRuntimeStore.loadThreadLaunchConfiguration(threadID: threadID),
+           currentConfiguration.modelProvider == targetModelProvider,
+           currentConfiguration.model == targetModel,
+           currentConfiguration.reasoningEffort == targetReasoningEffort {
+            return currentConfiguration
+        }
+
+        guard let snapshot = self.codexThreadRuntimeStore.updateThreadLaunchConfigurationIfPossible(
+            threadID: threadID,
+            modelProvider: targetModelProvider,
+            model: targetModel,
+            reasoningEffort: targetReasoningEffort
+        ) else {
+            throw NSError(
+                domain: "ccodexr.continuation",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "无法安全续接当前对话，请稍后重试。"]
+            )
+        }
+
+        return snapshot
+    }
+    private func activeModelProviderKey(for provider: CodexBarProvider) -> String {
+        switch provider.kind {
+        case .openAIOAuth:
+            return self.store.config.openAI.accountUsageMode == .aggregateGateway
+                ? "ccodexr-openai-gateway"
+                : "openai"
+        case .openAICompatible:
+            return "ccodexr-compatible"
         }
     }
 

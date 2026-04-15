@@ -27,6 +27,13 @@ struct CodexThreadRuntimeStore {
         let lastRuntimeAt: Date
     }
 
+    struct ThreadLaunchConfiguration: Equatable {
+        let threadID: String
+        let modelProvider: String
+        let model: String?
+        let reasoningEffort: String?
+    }
+
     enum UnavailableReason: Error, Equatable {
         case missingDatabase(name: String)
         case missingTable(database: String, table: String)
@@ -153,6 +160,119 @@ struct CodexThreadRuntimeStore {
         }
     }
 
+    func loadMostRecentThread(preferredSources: [String] = ["vscode"]) -> RuntimeThread? {
+        let stateDBURL = self.stateDBURLProvider()
+
+        do {
+            try self.requireDatabase(at: stateDBURL)
+            if let preferredThread = try self.loadMostRecentThread(
+                preferredSources: preferredSources,
+                stateDBURL: stateDBURL
+            ) {
+                return preferredThread
+            }
+            return try self.loadMostRecentThread(
+                preferredSources: [],
+                stateDBURL: stateDBURL
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    func loadThreadLaunchConfiguration(threadID: String) -> ThreadLaunchConfiguration? {
+        let sanitizedThreadID = threadID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard sanitizedThreadID.isEmpty == false else { return nil }
+
+        let stateDBURL = self.stateDBURLProvider()
+        do {
+            try self.requireDatabase(at: stateDBURL)
+            return try self.withReadConnection(at: stateDBURL) { db in
+                try self.validateSchema(
+                    in: db,
+                    table: "threads",
+                    requiredColumns: ["id", "model_provider", "model", "reasoning_effort", "archived"],
+                    databaseName: stateDBURL.lastPathComponent
+                )
+                return try self.loadThreadLaunchConfiguration(
+                    threadID: sanitizedThreadID,
+                    in: db
+                )
+            }
+        } catch {
+            return nil
+        }
+    }
+
+    @discardableResult
+    func updateThreadLaunchConfigurationIfPossible(
+        threadID: String,
+        modelProvider: String,
+        model: String?,
+        reasoningEffort: String?
+    ) -> ThreadLaunchConfiguration? {
+        let sanitizedThreadID = threadID.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sanitizedModelProvider = modelProvider.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard sanitizedThreadID.isEmpty == false, sanitizedModelProvider.isEmpty == false else { return nil }
+
+        let stateDBURL = self.stateDBURLProvider()
+        do {
+            try self.requireDatabase(at: stateDBURL)
+            return try self.withWriteConnection(at: stateDBURL) { db in
+                try self.validateSchema(
+                    in: db,
+                    table: "threads",
+                    requiredColumns: ["id", "model_provider", "model", "reasoning_effort", "archived"],
+                    databaseName: stateDBURL.lastPathComponent
+                )
+
+                guard let previous = try self.loadThreadLaunchConfiguration(
+                    threadID: sanitizedThreadID,
+                    in: db
+                ) else {
+                    return nil
+                }
+
+                let statement = try SQLiteStatement(
+                    database: db,
+                    sql: """
+                    UPDATE threads
+                    SET model_provider = ?, model = ?, reasoning_effort = ?
+                    WHERE archived = 0 AND id = ?
+                    """
+                )
+                try statement.bindText(sanitizedModelProvider, at: 1)
+                try statement.bindNullableText(model, at: 2)
+                try statement.bindNullableText(reasoningEffort, at: 3)
+                try statement.bindText(sanitizedThreadID, at: 4)
+                let stepResult = sqlite3_step(statement.handle)
+                guard stepResult == SQLITE_DONE else {
+                    throw UnavailableReason.queryFailed(
+                        message: "failed updating thread launch configuration (\(stepResult))"
+                    )
+                }
+
+                return previous
+            }
+        } catch let reason as UnavailableReason {
+            NSLog("ccodexr failed to update thread launch configuration: %@", reason.diagnosticMessage)
+            return nil
+        } catch {
+            NSLog("ccodexr failed to update thread launch configuration: %@", error.localizedDescription)
+            return nil
+        }
+    }
+
+    func restoreThreadLaunchConfigurationIfPossible(_ snapshot: ThreadLaunchConfiguration?) {
+        guard let snapshot else { return }
+        _ = self.updateThreadLaunchConfigurationIfPossible(
+            threadID: snapshot.threadID,
+            modelProvider: snapshot.modelProvider,
+            model: snapshot.model,
+            reasoningEffort: snapshot.reasoningEffort
+        )
+    }
+
     private func requireDatabase(at url: URL) throws {
         guard self.fileManager.fileExists(atPath: url.path) else {
             throw UnavailableReason.missingDatabase(name: url.lastPathComponent)
@@ -274,6 +394,106 @@ struct CodexThreadRuntimeStore {
         }
     }
 
+    private func loadMostRecentThread(
+        preferredSources: [String],
+        stateDBURL: URL
+    ) throws -> RuntimeThread? {
+        try self.withReadConnection(at: stateDBURL) { db in
+            try self.validateSchema(
+                in: db,
+                table: "threads",
+                requiredColumns: ["id", "source", "cwd", "title", "archived", "updated_at"],
+                databaseName: stateDBURL.lastPathComponent
+            )
+
+            let sourcePredicate: String
+            if preferredSources.isEmpty {
+                sourcePredicate = ""
+            } else {
+                let placeholders = Array(repeating: "?", count: preferredSources.count).joined(separator: ", ")
+                sourcePredicate = " AND source IN (\(placeholders))"
+            }
+
+            let statement = try SQLiteStatement(
+                database: db,
+                sql: """
+                SELECT id, source, cwd, title, updated_at
+                FROM threads
+                WHERE archived = 0\(sourcePredicate)
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """
+            )
+
+            for (index, source) in preferredSources.enumerated() {
+                try statement.bindText(source, at: Int32(index + 1))
+            }
+
+            let stepResult = sqlite3_step(statement.handle)
+            switch stepResult {
+            case SQLITE_ROW:
+                guard
+                    let threadID = statement.text(at: 0),
+                    let source = statement.text(at: 1),
+                    let cwd = statement.text(at: 2),
+                    let title = statement.text(at: 3)
+                else {
+                    return nil
+                }
+                return RuntimeThread(
+                    threadID: threadID,
+                    source: source,
+                    cwd: cwd,
+                    title: title,
+                    lastRuntimeAt: Date(timeIntervalSince1970: TimeInterval(statement.int64(at: 4)))
+                )
+            case SQLITE_DONE:
+                return nil
+            default:
+                throw UnavailableReason.queryFailed(
+                    message: "failed stepping latest thread query (\(stepResult))"
+                )
+            }
+        }
+    }
+
+    private func loadThreadLaunchConfiguration(
+        threadID: String,
+        in database: OpaquePointer
+    ) throws -> ThreadLaunchConfiguration? {
+        let statement = try SQLiteStatement(
+            database: database,
+            sql: """
+            SELECT id, model_provider, model, reasoning_effort
+            FROM threads
+            WHERE archived = 0 AND id = ?
+            LIMIT 1
+            """
+        )
+        try statement.bindText(threadID, at: 1)
+
+        let stepResult = sqlite3_step(statement.handle)
+        switch stepResult {
+        case SQLITE_ROW:
+            guard let resolvedThreadID = statement.text(at: 0),
+                  let modelProvider = statement.text(at: 1) else {
+                return nil
+            }
+            return ThreadLaunchConfiguration(
+                threadID: resolvedThreadID,
+                modelProvider: modelProvider,
+                model: statement.text(at: 2),
+                reasoningEffort: statement.text(at: 3)
+            )
+        case SQLITE_DONE:
+            return nil
+        default:
+            throw UnavailableReason.queryFailed(
+                message: "failed loading thread launch configuration (\(stepResult))"
+            )
+        }
+    }
+
     private func withReadConnection<T>(at url: URL, work: (OpaquePointer) throws -> T) throws -> T {
         var database: OpaquePointer?
         let openResult = sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READONLY, nil)
@@ -288,6 +508,30 @@ struct CodexThreadRuntimeStore {
             throw UnavailableReason.queryFailed(message: message)
         }
 
+        defer { sqlite3_close(database) }
+        return try work(database)
+    }
+
+    private func withWriteConnection<T>(at url: URL, work: (OpaquePointer) throws -> T) throws -> T {
+        var database: OpaquePointer?
+        let openResult = sqlite3_open_v2(
+            url.path,
+            &database,
+            SQLITE_OPEN_READWRITE,
+            nil
+        )
+        guard openResult == SQLITE_OK, let database else {
+            let message: String
+            if let database, let pointer = sqlite3_errmsg(database) {
+                message = String(cString: pointer)
+            } else {
+                message = "unable to open \(url.lastPathComponent) for writing"
+            }
+            sqlite3_close(database)
+            throw UnavailableReason.queryFailed(message: message)
+        }
+
+        sqlite3_busy_timeout(database, 1_500)
         defer { sqlite3_close(database) }
         return try work(database)
     }
@@ -462,6 +706,19 @@ private final class SQLiteStatement {
 
     func bindText(_ value: String, at index: Int32) throws {
         guard sqlite3_bind_text(self.handle, index, value, -1, sqliteTransientDestructor) == SQLITE_OK else {
+            throw CodexThreadRuntimeStore.UnavailableReason.queryFailed(
+                message: Self.errorMessage(for: self.database)
+            )
+        }
+    }
+
+    func bindNullableText(_ value: String?, at index: Int32) throws {
+        if let value {
+            try self.bindText(value, at: index)
+            return
+        }
+
+        guard sqlite3_bind_null(self.handle, index) == SQLITE_OK else {
             throw CodexThreadRuntimeStore.UnavailableReason.queryFailed(
                 message: Self.errorMessage(for: self.database)
             )

@@ -36,18 +36,64 @@ struct CostSummaryRowView: View {
 }
 
 struct CostDetailsPanelView: View {
-    static let panelWidth: CGFloat = 272
+    static let panelWidth: CGFloat = 408
 
-    static func panelHeight(hasHistory: Bool) -> CGFloat {
-        hasHistory ? 336 : 184
+    private static let detailRowHeight: CGFloat = 28
+    private static let detailMaxVisibleRows = 5
+    private static let detailTimeColumnWidth: CGFloat = 58
+    private static let detailTokenColumnWidth: CGFloat = 50
+    private static let detailCostColumnWidth: CGFloat = 72
+
+    static func panelHeight(summary: LocalCostSummary) -> CGFloat {
+        let baseHeight: CGFloat = summary.todayChartEntries.isEmpty ? 184 : 336
+        let todayEntryCount = summary.todayEntries.count
+        guard todayEntryCount > 0 else { return baseHeight }
+
+        let visibleRows = min(todayEntryCount, Self.detailMaxVisibleRows)
+        let detailSectionHeight = CGFloat(visibleRows) * Self.detailRowHeight + 76
+        return min(560, baseHeight + detailSectionHeight)
     }
 
     private struct Point: Identifiable {
         let id: String
-        let date: Date
+        let startDate: Date
+        let endDate: Date
         let costUSD: Double
+        let hasKnownPricing: Bool
         let totalTokens: Int
     }
+
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("HH:mm:ss")
+        return formatter
+    }()
+
+    private static let detailNumberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = Locale.autoupdatingCurrent.groupingSeparator
+        formatter.locale = .autoupdatingCurrent
+        return formatter
+    }()
+
+    private static let detailCurrencyFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.locale = .autoupdatingCurrent
+        formatter.minimumFractionDigits = 4
+        formatter.maximumFractionDigits = 6
+        return formatter
+    }()
+
+    private static let chartAxisFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = .autoupdatingCurrent
+        formatter.setLocalizedDateFormatFromTemplate("HH:mm")
+        return formatter
+    }()
 
     private struct MiniBarChart: View {
         let points: [Point]
@@ -108,16 +154,66 @@ struct CostDetailsPanelView: View {
     @State private var selectedID: String?
 
     private var points: [Point] {
-        Array(summary.dailyEntries.prefix(30))
-            .sorted { $0.date < $1.date }
-            .map { entry in
-                Point(id: entry.id, date: entry.date, costUSD: entry.costUSD, totalTokens: entry.totalTokens)
-            }
+        summary.todayChartEntries.map { entry in
+            Point(
+                id: entry.id,
+                startDate: entry.startDate,
+                endDate: entry.endDate,
+                costUSD: entry.costUSD,
+                hasKnownPricing: entry.hasKnownPricing,
+                totalTokens: entry.totalTokens
+            )
+        }
     }
 
-    private var selectedPoint: Point? {
-        guard let selectedID else { return nil }
-        return points.first(where: { $0.id == selectedID })
+    private var chartStartLabel: String? {
+        points.first.map { Self.chartAxisFormatter.string(from: $0.startDate) }
+    }
+
+    private var chartEndLabel: String? {
+        points.last.map { Self.chartAxisFormatter.string(from: $0.endDate) }
+    }
+
+    private var hasChartData: Bool {
+        points.isEmpty == false
+    }
+
+    private func chartRangeLabel(for point: Point) -> String {
+        let start = Self.chartAxisFormatter.string(from: point.startDate)
+        let end = Self.chartAxisFormatter.string(from: point.endDate)
+        return "\(start) - \(end)"
+    }
+
+    private var chartPrimaryLabel: String {
+        if let point = selectedPoint {
+            if point.hasKnownPricing == false && point.totalTokens > 0 {
+                return "\(chartRangeLabel(for: point)) · \(L.costUnavailable)"
+            }
+            return "\(chartRangeLabel(for: point)) · \(currency(point.costUSD))"
+        }
+        return L.costTodayTrendTitle
+    }
+
+    private var chartSecondaryLabel: String {
+        if let point = selectedPoint {
+            return L.tokenCount(compactTokens(point.totalTokens))
+        }
+        return L.costTodayTrendHint
+    }
+
+    private var chartEmptyLabel: String {
+        if summary.todayEntries.isEmpty {
+            return L.costNoHistory
+        }
+        return L.costTodayTrendEmpty
+    }
+
+    private var hasTodayDetails: Bool {
+        summary.todayEntries.isEmpty == false
+    }
+
+    private var detailTableHeight: CGFloat {
+        CGFloat(min(summary.todayEntries.count, Self.detailMaxVisibleRows)) * Self.detailRowHeight
     }
 
     var body: some View {
@@ -128,46 +224,51 @@ struct CostDetailsPanelView: View {
 
             Divider()
 
-            if points.isEmpty {
-                Text(L.costNoHistory)
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            } else {
+            if hasChartData {
                 MiniBarChart(points: points, selectedID: $selectedID)
 
                 HStack {
-                    if let first = points.first {
-                        Text(shortDay(first.date))
+                    if let chartStartLabel {
+                        Text(chartStartLabel)
                     }
 
                     Spacer()
 
-                    if let last = points.last {
-                        Text(shortDay(last.date))
+                    if let chartEndLabel {
+                        Text(chartEndLabel)
                     }
                 }
                 .font(.caption2)
                 .foregroundStyle(.secondary)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(primaryDetailText())
+                    Text(chartPrimaryLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .frame(height: 16, alignment: .leading)
-                    Text(secondaryDetailText())
+                    Text(chartSecondaryLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .frame(height: 16, alignment: .leading)
                 }
+            } else {
+                Text(chartEmptyLabel)
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            }
+
+            if hasTodayDetails {
+                Divider()
+                todayDetailsSection
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 12)
         .frame(
             width: Self.panelWidth,
-            height: Self.panelHeight(hasHistory: !points.isEmpty),
+            height: Self.panelHeight(summary: summary),
             alignment: .topLeading
         )
         .background(
@@ -179,6 +280,11 @@ struct CostDetailsPanelView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.secondary.opacity(0.12), lineWidth: 1)
         )
+    }
+
+    private var selectedPoint: Point? {
+        guard let selectedID else { return nil }
+        return points.first(where: { $0.id == selectedID })
     }
 
     private func metricRow(title: String, cost: Double, tokens: Int) -> some View {
@@ -197,17 +303,86 @@ struct CostDetailsPanelView: View {
         }
     }
 
-    private func primaryDetailText() -> String {
-        if let point = selectedPoint {
-            return "\(shortDay(point.date)) · \(currency(point.costUSD))"
+    private var todayDetailsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(L.costTodayDetailsTitle)
+                    .font(.system(size: 10, weight: .semibold))
+                Spacer()
+                Text(L.costTodayDetailsCount(summary.todayEntries.count))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+
+            detailHeaderRow
+
+            ScrollView(.vertical, showsIndicators: summary.todayEntries.count > Self.detailMaxVisibleRows) {
+                LazyVStack(spacing: 6) {
+                    ForEach(summary.todayEntries) { entry in
+                        detailRow(entry)
+                    }
+                }
+                .padding(.vertical, 1)
+            }
+            .frame(height: detailTableHeight)
         }
-        return L.costTrendTitle
     }
 
-    private func secondaryDetailText() -> String {
-        if let point = selectedPoint {
-            return L.tokenCount(compactTokens(point.totalTokens))
+    private var detailHeaderRow: some View {
+        HStack(spacing: 6) {
+            detailHeaderCell(L.costDetailsTime, width: Self.detailTimeColumnWidth, alignment: .leading)
+            detailHeaderCell(L.costDetailsRequest, width: Self.detailTokenColumnWidth)
+            detailHeaderCell(L.costDetailsCached, width: Self.detailTokenColumnWidth)
+            detailHeaderCell(L.costDetailsResponse, width: Self.detailTokenColumnWidth)
+            detailHeaderCell(L.costDetailsTotal, width: Self.detailTokenColumnWidth)
+            detailHeaderCell(L.costDetailsCost, width: Self.detailCostColumnWidth)
         }
-        return L.costHoverHint
+    }
+
+    private func detailHeaderCell(_ title: String, width: CGFloat, alignment: Alignment = .trailing) -> some View {
+        Text(title)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: width, alignment: alignment)
+    }
+
+    private func detailRow(_ entry: TodayCostEntry) -> some View {
+        HStack(spacing: 6) {
+            detailValueCell(Self.timeFormatter.string(from: entry.timestamp), width: Self.detailTimeColumnWidth, alignment: .leading)
+            detailValueCell(detailTokenCount(entry.requestTokens), width: Self.detailTokenColumnWidth)
+            detailValueCell(detailTokenCount(entry.cachedRequestTokens), width: Self.detailTokenColumnWidth)
+            detailValueCell(detailTokenCount(entry.responseTokens), width: Self.detailTokenColumnWidth)
+            detailValueCell(detailTokenCount(entry.totalTokens), width: Self.detailTokenColumnWidth)
+            detailValueCell(detailCost(entry), width: Self.detailCostColumnWidth)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: Self.detailRowHeight)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.06))
+        )
+        .help("\(entry.model) · \(entry.hasKnownPricing ? currency(entry.costUSD) : L.costUnavailable)")
+    }
+
+    private func detailValueCell(_ value: String, width: CGFloat, alignment: Alignment = .trailing) -> some View {
+        Text(value)
+            .font(.system(size: 10, weight: .medium))
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(width: width, alignment: alignment)
+    }
+
+    private func detailTokenCount(_ value: Int) -> String {
+        Self.detailNumberFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+
+    private func detailCost(_ entry: TodayCostEntry) -> String {
+        let value = entry.costUSD
+        guard entry.hasKnownPricing else { return L.costUnavailable }
+        if value >= 0.01 {
+            return currency(value)
+        }
+        return Self.detailCurrencyFormatter.string(from: NSNumber(value: value)) ?? currency(value)
     }
 }

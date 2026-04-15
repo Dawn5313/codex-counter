@@ -7,11 +7,14 @@ enum RuntimeSQLiteFixtureSupport {
     struct ThreadRow {
         let id: String
         let source: String
+        let modelProvider: String
         let cwd: String
         let title: String
         let createdAt: Int64
         let updatedAt: Int64
         let archived: Int
+        let model: String?
+        let reasoningEffort: String?
 
         init(
             id: String,
@@ -20,15 +23,21 @@ enum RuntimeSQLiteFixtureSupport {
             title: String,
             createdAt: Int64,
             updatedAt: Int64,
-            archived: Int = 0
+            archived: Int = 0,
+            modelProvider: String = "openai",
+            model: String? = "gpt-5.4",
+            reasoningEffort: String? = "xhigh"
         ) {
             self.id = id
             self.source = source
+            self.modelProvider = modelProvider
             self.cwd = cwd
             self.title = title
             self.createdAt = createdAt
             self.updatedAt = updatedAt
             self.archived = archived
+            self.model = model
+            self.reasoningEffort = reasoningEffort
         }
     }
 
@@ -61,6 +70,9 @@ enum RuntimeSQLiteFixtureSupport {
                 """
                 CREATE TABLE threads (
                     id TEXT PRIMARY KEY,
+                    model_provider TEXT NOT NULL,
+                    model TEXT,
+                    reasoning_effort TEXT,
                     source TEXT NOT NULL,
                     cwd TEXT NOT NULL,
                     title TEXT NOT NULL,
@@ -72,23 +84,29 @@ enum RuntimeSQLiteFixtureSupport {
                 in: database
             )
 
-            let statement = try SQLiteFixtureStatement(
-                database: database,
-                sql: """
-                INSERT INTO threads (id, source, cwd, title, archived, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                let statement = try SQLiteFixtureStatement(
+                    database: database,
+                    sql: """
+                INSERT INTO threads (
+                    id, model_provider, model, reasoning_effort,
+                    source, cwd, title, archived, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
-            )
+                )
 
             for thread in threads {
                 try statement.reset()
                 try statement.bindText(thread.id, at: 1)
-                try statement.bindText(thread.source, at: 2)
-                try statement.bindText(thread.cwd, at: 3)
-                try statement.bindText(thread.title, at: 4)
-                try statement.bindInt(thread.archived, at: 5)
-                try statement.bindInt64(thread.createdAt, at: 6)
-                try statement.bindInt64(thread.updatedAt, at: 7)
+                try statement.bindText(thread.modelProvider, at: 2)
+                try statement.bindOptionalText(thread.model, at: 3)
+                try statement.bindOptionalText(thread.reasoningEffort, at: 4)
+                try statement.bindText(thread.source, at: 5)
+                try statement.bindText(thread.cwd, at: 6)
+                try statement.bindText(thread.title, at: 7)
+                try statement.bindInt(thread.archived, at: 8)
+                try statement.bindInt64(thread.createdAt, at: 9)
+                try statement.bindInt64(thread.updatedAt, at: 10)
                 try statement.step()
             }
         }

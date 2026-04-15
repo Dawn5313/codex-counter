@@ -256,6 +256,87 @@ final class CodexThreadRuntimeStoreTests: CodexBarTestCase {
         XCTAssertTrue(snapshot.threads.isEmpty)
     }
 
+    func testLoadMostRecentThreadPrefersDesktopSource() throws {
+        let store = self.makeStore()
+        try RuntimeSQLiteFixtureSupport.writeStateDatabase(
+            at: CodexPaths.stateSQLiteURL,
+            threads: [
+                .init(
+                    id: "thread-cli",
+                    source: "cli",
+                    cwd: "/repo/cli",
+                    title: "CLI thread",
+                    createdAt: 1,
+                    updatedAt: 100
+                ),
+                .init(
+                    id: "thread-vscode",
+                    source: "vscode",
+                    cwd: "/repo/app",
+                    title: "Desktop thread",
+                    createdAt: 1,
+                    updatedAt: 90
+                ),
+            ]
+        )
+
+        let thread = store.loadMostRecentThread()
+
+        XCTAssertEqual(thread?.threadID, "thread-vscode")
+        XCTAssertEqual(thread?.source, "vscode")
+    }
+
+    func testUpdateThreadLaunchConfigurationCanBeRestoredAfterProviderSwitch() throws {
+        let store = self.makeStore()
+        try RuntimeSQLiteFixtureSupport.writeStateDatabase(
+            at: CodexPaths.stateSQLiteURL,
+            threads: [
+                .init(
+                    id: "thread-vscode",
+                    source: "vscode",
+                    cwd: "/repo/app",
+                    title: "Desktop thread",
+                    createdAt: 1,
+                    updatedAt: 90,
+                    modelProvider: "openai",
+                    model: "gpt-5.4",
+                    reasoningEffort: "xhigh"
+                ),
+            ]
+        )
+
+        let original = try XCTUnwrap(
+            store.loadThreadLaunchConfiguration(threadID: "thread-vscode")
+        )
+        XCTAssertEqual(original.modelProvider, "openai")
+        XCTAssertEqual(original.model, "gpt-5.4")
+        XCTAssertEqual(original.reasoningEffort, "xhigh")
+
+        let snapshot = try XCTUnwrap(
+            store.updateThreadLaunchConfigurationIfPossible(
+                threadID: "thread-vscode",
+                modelProvider: "ccodexr-compatible",
+                model: "gpt-5.4-mini",
+                reasoningEffort: "high"
+            )
+        )
+        XCTAssertEqual(snapshot, original)
+
+        let updated = try XCTUnwrap(
+            store.loadThreadLaunchConfiguration(threadID: "thread-vscode")
+        )
+        XCTAssertEqual(updated.modelProvider, "ccodexr-compatible")
+        XCTAssertEqual(updated.model, "gpt-5.4-mini")
+        XCTAssertEqual(updated.reasoningEffort, "high")
+
+        store.restoreThreadLaunchConfigurationIfPossible(snapshot)
+
+        let restored = try XCTUnwrap(
+            store.loadThreadLaunchConfiguration(threadID: "thread-vscode")
+        )
+        XCTAssertEqual(restored, original)
+    }
+
     private func date(_ value: String) -> Date {
         ISO8601DateFormatter().date(from: value) ?? Date(timeIntervalSince1970: 0)
     }

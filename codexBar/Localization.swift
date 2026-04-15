@@ -571,6 +571,45 @@ enum L {
     static var costHoverHint: String {
         zh ? "悬停柱状图查看每日详情" : "Hover bars for daily details"
     }
+    static var costTodayTrendTitle: String {
+        zh ? "今日趋势（08:00 后）" : "Today's Trend (Since 8:00)"
+    }
+    static var costTodayTrendHint: String {
+        zh ? "悬停柱状图查看时段详情" : "Hover bars for time-range details"
+    }
+    static var costTodayTrendEmpty: String {
+        zh ? "今天 08:00 后暂无趋势数据。" : "No trend data since 8:00 today."
+    }
+    static var costTodayDetailsTitle: String {
+        zh ? "今日请求明细" : "Today's Usage Details"
+    }
+    static func costTodayDetailsCount(_ count: Int) -> String {
+        zh ? "\(count) 条" : "\(count) entries"
+    }
+    static var costTodayDetailsEmpty: String {
+        zh ? "今天还没有记录到请求明细。" : "No request details recorded today."
+    }
+    static var costDetailsTime: String {
+        zh ? "时间" : "Time"
+    }
+    static var costDetailsRequest: String {
+        zh ? "请求" : "Request"
+    }
+    static var costDetailsCached: String {
+        zh ? "缓存" : "Cached"
+    }
+    static var costDetailsResponse: String {
+        zh ? "回答" : "Response"
+    }
+    static var costDetailsTotal: String {
+        zh ? "总计" : "Total"
+    }
+    static var costDetailsCost: String {
+        zh ? "成本" : "Cost"
+    }
+    static var costUnavailable: String {
+        zh ? "未定价" : "Unpriced"
+    }
     static func planBadgeTitle(_ planType: String) -> String {
         let normalized = planType.lowercased()
         if zh {

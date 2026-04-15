@@ -97,9 +97,52 @@ final class CodexSyncServiceTests: CodexBarTestCase {
         XCTAssertTrue(authText.contains(#""auth_mode" : "chatgpt""#))
         XCTAssertTrue(authText.contains("access-pool"))
         XCTAssertFalse(authText.contains("codexbar-local-gateway"))
-        XCTAssertTrue(tomlText.contains(#"openai_base_url = "http://localhost:1456/v1""#))
+        XCTAssertTrue(tomlText.contains(#"model_provider = "ccodexr-openai-gateway""#))
+        XCTAssertTrue(tomlText.contains(#"[model_providers.ccodexr-openai-gateway]"#))
+        XCTAssertTrue(tomlText.contains(#"base_url = "http://localhost:1456/v1""#))
+        XCTAssertTrue(tomlText.contains("requires_openai_auth = true"))
+        XCTAssertTrue(tomlText.contains("supports_websockets = false"))
         XCTAssertTrue(tomlText.contains(#"service_tier = "fast""#))
         XCTAssertFalse(tomlText.contains("preferred_auth_method"))
+        XCTAssertFalse(tomlText.contains("openai_base_url"))
+    }
+
+    func testSynchronizeWritesManagedCustomProviderBlockForCompatibleProvider() throws {
+        try CodexPaths.ensureDirectories()
+
+        let account = CodexBarProviderAccount(
+            id: "acct_custom",
+            kind: .apiKey,
+            label: "Default",
+            apiKey: "sk-test-custom"
+        )
+        let provider = CodexBarProvider(
+            id: "provider-custom",
+            kind: .openAICompatible,
+            label: "My Relay",
+            baseURL: "https://example.invalid/v1",
+            activeAccountId: account.id,
+            accounts: [account]
+        )
+        let config = CodexBarConfig(
+            active: CodexBarActiveSelection(providerId: provider.id, accountId: account.id),
+            providers: [provider]
+        )
+
+        try CodexSyncService().synchronize(config: config)
+
+        let authText = try String(contentsOf: CodexPaths.authURL, encoding: .utf8)
+        let tomlText = try String(contentsOf: CodexPaths.configTomlURL, encoding: .utf8)
+
+        XCTAssertTrue(authText.contains(#""OPENAI_API_KEY" : "sk-test-custom""#))
+        XCTAssertTrue(tomlText.contains(#"model_provider = "ccodexr-compatible""#))
+        XCTAssertTrue(tomlText.contains(#"[model_providers.ccodexr-compatible]"#))
+        XCTAssertTrue(tomlText.contains(#"name = "My Relay""#))
+        XCTAssertTrue(tomlText.contains(#"base_url = "https://example.invalid/v1""#))
+        XCTAssertTrue(tomlText.contains(#"env_key = "OPENAI_API_KEY""#))
+        XCTAssertTrue(tomlText.contains(#"wire_api = "responses""#))
+        XCTAssertTrue(tomlText.contains("supports_websockets = false"))
+        XCTAssertFalse(tomlText.contains("openai_base_url"))
     }
 
     private enum SyncFailure: Error, Equatable {

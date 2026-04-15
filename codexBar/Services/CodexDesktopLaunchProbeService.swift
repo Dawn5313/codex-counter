@@ -97,12 +97,14 @@ final class CodexDesktopLaunchProbeService {
     typealias AppLocator = @MainActor () -> CodexDesktopResolvedAppLocation?
     typealias Launcher = @MainActor (_ appURL: URL, _ environment: [String: String]) async throws -> NSRunningApplication?
     typealias ActiveEnvironmentProvider = @MainActor () -> [String: String]
+    typealias URLOpener = @MainActor (_ url: URL) -> Bool
     typealias ProcessIsRunning = @MainActor (_ processIdentifier: pid_t) -> Bool
 
     private let preferredAppPathProvider: PreferredAppPathProvider
     private let locateCodexApp: AppLocator
     private let launchApp: Launcher
     private let activeEnvironmentProvider: ActiveEnvironmentProvider
+    private let openURL: URLOpener
     private let processIsRunning: ProcessIsRunning
     private let fileManager: FileManager
     private let environment: [String: String]
@@ -117,6 +119,9 @@ final class CodexDesktopLaunchProbeService {
         launchApp: @escaping Launcher = defaultCodexDesktopLauncher,
         activeEnvironmentProvider: @escaping ActiveEnvironmentProvider = {
             CodexDesktopLaunchProbeService.activeProviderEnvironment()
+        },
+        openURL: @escaping URLOpener = { url in
+            NSWorkspace.shared.open(url)
         },
         processIsRunning: @escaping ProcessIsRunning = { processIdentifier in
             guard processIdentifier > 0 else { return false }
@@ -134,6 +139,7 @@ final class CodexDesktopLaunchProbeService {
         self.locateCodexApp = locateCodexApp
         self.launchApp = launchApp
         self.activeEnvironmentProvider = activeEnvironmentProvider
+        self.openURL = openURL
         self.processIsRunning = processIsRunning
         self.fileManager = fileManager
         self.environment = environment
@@ -202,7 +208,7 @@ final class CodexDesktopLaunchProbeService {
         return state
     }
 
-    func launchNewInstance() async throws -> NSRunningApplication? {
+    func launchNewInstance(resumeThreadID: String? = nil) async throws -> NSRunningApplication? {
         guard let appURL = self.resolvedCodexAppLocation()?.url else {
             throw CodexDesktopLaunchProbeError.codexAppNotFound
         }
@@ -212,7 +218,9 @@ final class CodexDesktopLaunchProbeService {
         launchEnvironment.removeValue(forKey: "CODEXBAR_DESKTOP_PROBE_HITS_DIR")
         launchEnvironment = Self.appendingLocalProxyBypass(to: launchEnvironment)
 
-        return try await self.launchApp(appURL, launchEnvironment)
+        let application = try await self.launchApp(appURL, launchEnvironment)
+        await self.resumeThreadIfPossible(threadID: resumeThreadID)
+        return application
     }
 
     func runningCodexApplications() -> [NSRunningApplication] {
@@ -457,6 +465,25 @@ final class CodexDesktopLaunchProbeService {
         "'" + value.replacingOccurrences(of: "'", with: "'\"'\"'") + "'"
     }
 
+    private func resumeThreadIfPossible(threadID: String?) async {
+        guard
+            let threadID = threadID?.trimmingCharacters(in: .whitespacesAndNewlines),
+            threadID.isEmpty == false,
+            let url = Self.threadURL(for: threadID)
+        else {
+            return
+        }
+
+        for delay in [0 as UInt64, 350_000_000, 1_000_000_000, 2_000_000_000, 4_000_000_000] {
+            if delay > 0 {
+                try? await Task.sleep(nanoseconds: delay)
+            }
+            if self.openURL(url) {
+                return
+            }
+        }
+    }
+
     private static func appendingLocalProxyBypass(
         to environment: [String: String]
     ) -> [String: String] {
@@ -483,5 +510,11 @@ final class CodexDesktopLaunchProbeService {
             merged.append(host)
         }
         return merged.joined(separator: ",")
+    }
+
+    nonisolated static func threadURL(for threadID: String) -> URL? {
+        let trimmed = threadID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return nil }
+        return URL(string: "codex://threads/\(trimmed)")
     }
 }

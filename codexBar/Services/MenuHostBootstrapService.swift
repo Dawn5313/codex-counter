@@ -24,9 +24,10 @@ enum CodexBarInterprocess {
 final class MenuHostBootstrapService {
     static let shared = MenuHostBootstrapService()
 
-    static let helperBundleIdentifier = "com.dawn5313.ccodexr.menuhost"
-    static let helperMarkerInfoKey = "CodexBarMenuHost"
-    static let helperSourceVersionKey = "CodexBarMenuHostSourceVersion"
+    nonisolated static let helperBundleIdentifier = "com.dawn5313.ccodexr.menuhost"
+    nonisolated static let helperMarkerInfoKey = "CodexBarMenuHost"
+    nonisolated static let helperSourceVersionKey = "CodexBarMenuHostSourceVersion"
+    nonisolated static let helperSourceSignatureKey = "CodexBarMenuHostSourceSignature"
 
     static var isMenuHostProcess: Bool {
         if Bundle.main.object(forInfoDictionaryKey: self.helperMarkerInfoKey) as? Bool == true {
@@ -58,17 +59,41 @@ final class MenuHostBootstrapService {
         let helperURL = CodexPaths.menuHostAppURL
         let sourceURL = Bundle.main.bundleURL
 
-        if self.helperNeedsRefresh(at: helperURL) {
+        if Self.helperNeedsRefresh(
+            at: helperURL,
+            sourceURL: sourceURL,
+            fileManager: self.fileManager
+        ) {
             try self.replaceHelperBundle(at: helperURL, from: sourceURL)
         }
 
         return helperURL
     }
 
-    private func helperNeedsRefresh(at helperURL: URL) -> Bool {
-        guard self.fileManager.fileExists(atPath: helperURL.path) else { return true }
-        guard let helperBundle = Bundle(url: helperURL),
-              let sourceVersion = Bundle.main.object(
+    nonisolated static func helperNeedsRefresh(
+        at helperURL: URL,
+        sourceURL: URL,
+        fileManager: FileManager = .default
+    ) -> Bool {
+        guard fileManager.fileExists(atPath: helperURL.path) else { return true }
+        guard let helperBundle = Bundle(url: helperURL) else {
+            return true
+        }
+
+        if let sourceSignature = self.helperSourceSignature(
+            for: sourceURL,
+            fileManager: fileManager
+        ) {
+            guard let storedSourceSignature = helperBundle.object(
+                forInfoDictionaryKey: Self.helperSourceSignatureKey
+            ) as? String else {
+                return true
+            }
+            return storedSourceSignature != sourceSignature
+        }
+
+        guard let sourceBundle = Bundle(url: sourceURL),
+              let sourceVersion = sourceBundle.object(
                 forInfoDictionaryKey: "CFBundleVersion"
               ) as? String,
               let storedSourceVersion = helperBundle.object(
@@ -80,13 +105,63 @@ final class MenuHostBootstrapService {
         return storedSourceVersion != sourceVersion
     }
 
+    nonisolated static func helperSourceSignature(
+        for bundleURL: URL,
+        fileManager: FileManager = .default
+    ) -> String? {
+        guard let bundle = Bundle(url: bundleURL),
+              let executableURL = bundle.executableURL else {
+            return nil
+        }
+
+        let infoPlistURL = bundleURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Info.plist")
+
+        guard let executableSignature = self.fileRefreshSignature(
+            at: executableURL,
+            fileManager: fileManager
+        ),
+        let infoPlistSignature = self.fileRefreshSignature(
+            at: infoPlistURL,
+            fileManager: fileManager
+        ) else {
+            return nil
+        }
+
+        let bundleVersion = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+        return [
+            bundleVersion,
+            executableSignature,
+            infoPlistSignature,
+        ].joined(separator: "|")
+    }
+
+    private nonisolated static func fileRefreshSignature(
+        at fileURL: URL,
+        fileManager: FileManager
+    ) -> String? {
+        guard fileManager.fileExists(atPath: fileURL.path),
+              let attributes = try? fileManager.attributesOfItem(atPath: fileURL.path),
+              let size = attributes[.size] as? NSNumber,
+              let modificationDate = attributes[.modificationDate] as? Date else {
+            return nil
+        }
+
+        return "\(size.int64Value):\(modificationDate.timeIntervalSince1970)"
+    }
+
     private func replaceHelperBundle(at helperURL: URL, from sourceURL: URL) throws {
         if self.helperIsRunning(),
            let runningHelper = NSRunningApplication.runningApplications(
                 withBundleIdentifier: Self.helperBundleIdentifier
            ).first {
             runningHelper.terminate()
-            Thread.sleep(forTimeInterval: 0.5)
+            self.waitForHelperToExit(processIdentifier: runningHelper.processIdentifier, timeout: 2)
+            if self.helperIsRunning() {
+                _ = runningHelper.forceTerminate()
+                self.waitForHelperToExit(processIdentifier: runningHelper.processIdentifier, timeout: 2)
+            }
         }
 
         if self.fileManager.fileExists(atPath: helperURL.path) {
@@ -114,6 +189,10 @@ final class MenuHostBootstrapService {
         plist[Self.helperSourceVersionKey] = Bundle.main.object(
             forInfoDictionaryKey: "CFBundleVersion"
         )
+        plist[Self.helperSourceSignatureKey] = Self.helperSourceSignature(
+            for: Bundle.main.bundleURL,
+            fileManager: self.fileManager
+        )
         plist.removeValue(forKey: "CFBundleURLTypes")
 
         let patched = try PropertyListSerialization.data(
@@ -122,6 +201,18 @@ final class MenuHostBootstrapService {
             options: 0
         )
         try patched.write(to: plistURL, options: .atomic)
+    }
+
+    private func waitForHelperToExit(processIdentifier: pid_t, timeout: TimeInterval) {
+        guard processIdentifier > 0 else { return }
+        let deadline = Date().addingTimeInterval(max(timeout, 0))
+        while Date() < deadline {
+            let isStillRunning = NSRunningApplication.runningApplications(
+                withBundleIdentifier: Self.helperBundleIdentifier
+            ).contains(where: { $0.processIdentifier == processIdentifier })
+            guard isStillRunning else { return }
+            Thread.sleep(forTimeInterval: 0.1)
+        }
     }
 
     private func helperIsRunning() -> Bool {

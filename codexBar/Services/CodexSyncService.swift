@@ -21,6 +21,9 @@ enum CodexSyncError: LocalizedError {
 }
 
 struct CodexSyncService: CodexSynchronizing {
+    private static let compatibleProviderKey = "ccodexr-compatible"
+    private static let aggregateGatewayProviderKey = "ccodexr-openai-gateway"
+
     private let ensureDirectories: () throws -> Void
     private let backupFileIfPresent: (URL, URL) throws -> Void
     private let writeSecureFile: (Data, URL) throws -> Void
@@ -145,7 +148,10 @@ struct CodexSyncService: CodexSynchronizing {
         provider: CodexBarProvider
     ) -> String {
         var text = existingText
-        let modelProviderKey = "openai"
+        let modelProviderKey = self.modelProviderKey(
+            config: config,
+            provider: provider
+        )
 
         text = self.upsertSetting(text, key: "model_provider", value: self.quote(modelProviderKey))
         text = self.upsertSetting(text, key: "model", value: self.quote(global.defaultModel))
@@ -164,19 +170,63 @@ struct CodexSyncService: CodexSynchronizing {
         text = self.removeBlock(text, key: "openai")
         text = self.removeManagedCompatibleProviderBlocks(text)
 
-        if provider.kind == .openAIOAuth,
-           config.openAI.accountUsageMode == .aggregateGateway {
-            text = self.upsertSetting(
+        if let managedProviderBlock = self.managedProviderBlock(
+            config: config,
+            provider: provider
+        ) {
+            text = self.upsertProviderBlock(
                 text,
-                key: "openai_base_url",
-                value: self.quote(OpenAIAccountGatewayConfiguration.baseURLString)
+                key: modelProviderKey,
+                body: managedProviderBlock
             )
-        } else if provider.kind == .openAICompatible, let baseURL = provider.baseURL {
-            text = self.upsertSetting(text, key: "openai_base_url", value: self.quote(baseURL))
         }
 
         return text.replacingOccurrences(of: "\n\n\n", with: "\n\n")
             .trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+    }
+
+    private func modelProviderKey(
+        config: CodexBarConfig,
+        provider: CodexBarProvider
+    ) -> String {
+        switch provider.kind {
+        case .openAIOAuth:
+            return config.openAI.accountUsageMode == .aggregateGateway
+                ? Self.aggregateGatewayProviderKey
+                : "openai"
+        case .openAICompatible:
+            return Self.compatibleProviderKey
+        }
+    }
+
+    private func managedProviderBlock(
+        config: CodexBarConfig,
+        provider: CodexBarProvider
+    ) -> String? {
+        switch provider.kind {
+        case .openAIOAuth:
+            guard config.openAI.accountUsageMode == .aggregateGateway else { return nil }
+            return [
+                #"name = "ccodexr OpenAI Gateway""#,
+                "base_url = \(self.quote(OpenAIAccountGatewayConfiguration.baseURLString))",
+                #"wire_api = "responses""#,
+                "requires_openai_auth = true",
+                "supports_websockets = false",
+            ].joined(separator: "\n")
+
+        case .openAICompatible:
+            guard let baseURL = provider.baseURL, baseURL.isEmpty == false else { return nil }
+            let displayName = provider.label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                ? "ccodexr Compatible Provider"
+                : provider.label
+            return [
+                "name = \(self.quote(displayName))",
+                "base_url = \(self.quote(baseURL))",
+                #"wire_api = "responses""#,
+                #"env_key = "OPENAI_API_KEY""#,
+                "supports_websockets = false",
+            ].joined(separator: "\n")
+        }
     }
 
     private func quote(_ value: String) -> String {
@@ -213,10 +263,34 @@ struct CodexSyncService: CodexSynchronizing {
     }
 
     private func removeManagedCompatibleProviderBlocks(_ text: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: #"(?ms)^\[model_providers\.codexbar-[^\]\n]+\]\n.*?(?=^\[|\Z)"#) else {
+        guard let regex = try? NSRegularExpression(pattern: #"(?ms)^\[model_providers\.ccodexr-[^\]\n]+\]\n.*?(?=^\[|\Z)"#) else {
             return text
         }
         let range = NSRange(text.startIndex..., in: text)
         return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+    }
+
+    private func upsertProviderBlock(_ text: String, key: String, body: String) -> String {
+        let block = "[model_providers.\(key)]\n\(body.trimmingCharacters(in: .whitespacesAndNewlines))"
+        guard let regex = try? NSRegularExpression(
+            pattern: #"(?ms)^\[model_providers\.#(key)\]\n.*?(?=^\[|\Z)"#
+                .replacingOccurrences(
+                    of: "#(key)",
+                    with: NSRegularExpression.escapedPattern(for: key)
+                )
+        ) else {
+            return text
+        }
+
+        let range = NSRange(text.startIndex..., in: text)
+        if regex.firstMatch(in: text, range: range) != nil {
+            return regex.stringByReplacingMatches(in: text, range: range, withTemplate: block + "\n")
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else {
+            return block + "\n"
+        }
+        return trimmed + "\n\n" + block + "\n"
     }
 }

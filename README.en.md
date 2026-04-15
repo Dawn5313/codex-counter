@@ -6,6 +6,16 @@ Keep Codex Desktop context and session history in one shared pool when switching
 
 > after switching accounts or providers, you still want to keep using the same `~/.codex` history pool instead of splitting sessions and context across multiple homes.
 
+## Project Ownership
+
+`ccodexr` is now maintained and published by [Dawn5313](https://github.com/Dawn5313). This repository is the primary home for ongoing releases, maintenance, and product direction.
+
+At the same time, it is still a derivative open-source project evolved from the original `codexbar` codebase, so the original project history, license, and source relationship should remain visible. In practice:
+
+- you are the current maintainer and publisher of this repository
+- the original authors and historical contributors should not be removed from license and attribution context
+- even after substantial rewrites, it is still better to keep a clear `based on codexbar` note
+
 ## What It Does
 
 The idea is simple:

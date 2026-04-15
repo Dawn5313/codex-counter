@@ -478,7 +478,9 @@ final class OpenAIAccountGatewayService: OpenAIAccountGatewayControlling {
         var upstreamRequest = URLRequest(url: route.upstreamURL(using: self.runtimeConfiguration))
         upstreamRequest.httpMethod = "POST"
         upstreamRequest.httpBody = normalizedBody
-        let mutableRequest = (upstreamRequest as NSURLRequest).mutableCopy() as! NSMutableURLRequest
+        guard let mutableRequest = (upstreamRequest as NSURLRequest).mutableCopy() as? NSMutableURLRequest else {
+            throw URLError(.cannotCreateFile)
+        }
         URLProtocol.setProperty(
             normalizedBody,
             forKey: Self.mockRequestBodyPropertyKey,

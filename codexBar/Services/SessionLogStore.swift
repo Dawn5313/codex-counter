@@ -54,6 +54,7 @@ final class SessionLogStore {
 
     struct UsageEvent: Codable, Equatable {
         let timestamp: Date
+        let model: String?
         let usage: Usage
     }
 
@@ -83,7 +84,7 @@ final class SessionLogStore {
     private let codexRootURL: URL
     private let persistedCacheURL: URL
     private let queue = DispatchQueue(label: "com.dawn5313.ccodexr.session-log-store", qos: .utility)
-    private let persistedCacheVersion = 4
+    private let persistedCacheVersion = 5
 
     private var sessionCache: [URL: CachedSessionRecord] = [:]
 
@@ -200,14 +201,19 @@ final class SessionLogStore {
 
         return FileFingerprint(
             fileSize: values.fileSize ?? 0,
-            modificationDate: values.contentModificationDate ?? .distantPast
+            modificationDate: self.normalizedFingerprintDate(values.contentModificationDate ?? .distantPast)
         )
+    }
+
+    private func normalizedFingerprintDate(_ date: Date) -> Date {
+        Date(timeIntervalSince1970: floor(date.timeIntervalSince1970))
     }
 
     private func parseSession(_ fileURL: URL, fingerprint: FileFingerprint) -> CachedSessionRecord {
         var sessionID: String?
         var sessionDate: Date?
-        var model: String?
+        var currentModel: String?
+        var latestModel: String?
         var latestUsage: Usage?
         var previousTotalUsage: Usage?
         var usageEvents: [UsageEvent] = []
@@ -215,7 +221,10 @@ final class SessionLogStore {
 
         let didRead = self.enumerateLines(in: fileURL) { line in
             self.consumeSessionMetadata(in: line, sessionID: &sessionID, sessionDate: &sessionDate)
-            self.consumeTurnContext(in: line, model: &model)
+            self.consumeTurnContext(in: line, model: &currentModel)
+            if let currentModel {
+                latestModel = currentModel
+            }
             self.consumeTaskLifecycle(in: line, taskLifecycleState: &taskLifecycleState)
             if let sample = self.parseUsageSample(from: line) {
                 latestUsage = sample.totalUsage
@@ -228,7 +237,11 @@ final class SessionLogStore {
                 let eventTimestamp = sample.timestamp ?? sessionDate ?? fingerprint.modificationDate
                 if incrementalUsage.isZero == false {
                     usageEvents.append(
-                        UsageEvent(timestamp: eventTimestamp, usage: incrementalUsage)
+                        UsageEvent(
+                            timestamp: eventTimestamp,
+                            model: currentModel ?? latestModel,
+                            usage: incrementalUsage
+                        )
                     )
                 }
             }
@@ -237,7 +250,7 @@ final class SessionLogStore {
         let record: SessionRecord?
         if didRead,
            let startedAt = sessionDate,
-           let resolvedModel = model,
+           let resolvedModel = latestModel ?? currentModel,
            let usage = latestUsage {
             record = SessionRecord(
                 id: sessionID ?? fileURL.deletingPathExtension().lastPathComponent,
@@ -292,8 +305,7 @@ final class SessionLogStore {
     }
 
     private func consumeTurnContext(in line: String, model: inout String?) {
-        guard model == nil,
-              line.contains("\"type\":\"turn_context\"") else { return }
+        guard line.contains("\"type\":\"turn_context\"") else { return }
 
         if let payload = self.payloadSlice(in: line),
            let currentModel = self.extractString("model", in: payload) {

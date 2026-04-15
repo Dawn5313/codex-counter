@@ -203,6 +203,60 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
         XCTAssertEqual(capturedEnvironment["no_proxy"], "localhost,127.0.0.1,::1")
     }
 
+    func testLaunchNewInstanceReopensRequestedThreadURL() async throws {
+        let codexAppURL = try self.makeFakeCodexApp()
+        var openedURLs: [URL] = []
+
+        let service = CodexDesktopLaunchProbeService(
+            locateCodexApp: {
+                CodexDesktopResolvedAppLocation(
+                    url: codexAppURL,
+                    source: .bundleIdentifierLookup
+                )
+            },
+            launchApp: { _, _ in nil },
+            openURL: { url in
+                openedURLs.append(url)
+                return true
+            }
+        )
+
+        _ = try await service.launchNewInstance(resumeThreadID: "thread-123")
+
+        XCTAssertEqual(
+            openedURLs,
+            [try XCTUnwrap(CodexDesktopLaunchProbeService.threadURL(for: "thread-123"))]
+        )
+    }
+
+    func testLaunchNewInstanceRetriesReopeningRequestedThreadURLUntilAccepted() async throws {
+        let codexAppURL = try self.makeFakeCodexApp()
+        let expectedURL = try XCTUnwrap(
+            CodexDesktopLaunchProbeService.threadURL(for: "thread-123")
+        )
+        var openedURLs: [URL] = []
+        var openAttempts = 0
+
+        let service = CodexDesktopLaunchProbeService(
+            locateCodexApp: {
+                CodexDesktopResolvedAppLocation(
+                    url: codexAppURL,
+                    source: .bundleIdentifierLookup
+                )
+            },
+            launchApp: { _, _ in nil },
+            openURL: { url in
+                openedURLs.append(url)
+                openAttempts += 1
+                return openAttempts >= 2
+            }
+        )
+
+        _ = try await service.launchNewInstance(resumeThreadID: "thread-123")
+
+        XCTAssertEqual(openedURLs, [expectedURL, expectedURL])
+    }
+
     func testLaunchNewInstancePreservesExistingNoProxyEntries() async throws {
         let codexAppURL = try self.makeFakeCodexApp()
         var capturedEnvironment: [String: String] = [:]
