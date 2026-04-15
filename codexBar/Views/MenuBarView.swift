@@ -318,6 +318,10 @@ struct MenuBarView: View {
         )
     }
 
+    private var shouldScrollOpenAIAccounts: Bool {
+        self.store.accounts.count > self.visibleOpenAIAccountLimit
+    }
+
     private var availableCount: Int {
         store.accounts.filter { $0.usageStatus == .ok }.count
     }
@@ -350,7 +354,7 @@ struct MenuBarView: View {
             refreshRunningThreadAttribution()
         }
         .onReceive(NotificationCenter.default.publisher(for: .openAILoginDidFail)) { notification in
-            showError = notification.userInfo?["message"] as? String ?? "OpenAI login failed."
+            showError = notification.userInfo?["message"] as? String ?? L.openAILoginFailed
         }
         .onAppear {
             countdownTimerConnection?.cancel()
@@ -444,7 +448,7 @@ struct MenuBarView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(self.activeProviderSummaryTitle(activeProvider: activeProvider, activeAccount: activeAccount))
                         .font(.system(size: 11, weight: .medium))
-                    Text("Model: \(store.activeModel)")
+                    Text(L.modelLabel(store.activeModel))
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
@@ -466,14 +470,14 @@ struct MenuBarView: View {
                         .foregroundColor(.secondary)
                     Text(L.noAccounts)
                         .foregroundColor(.secondary)
-                    Text("Add an OpenAI account or create a custom provider.")
+                    Text(L.emptyStateAddAccountOrProvider)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 24)
             } else {
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     VStack(alignment: .leading, spacing: 0) {
                         CostSummaryRowView(
                             summary: store.localCostSummary,
@@ -490,9 +494,9 @@ struct MenuBarView: View {
                         setCostSummaryHover(hovering)
                     }
 
-                    openAIAccountsSection
-
                     providersSection
+
+                    openAIAccountsSection
 
                 }
                 .padding(.horizontal, 8)
@@ -557,7 +561,7 @@ struct MenuBarView: View {
                         .font(.system(size: 12))
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("login toolbar button")
+                .accessibilityLabel(L.loginToolbarButton)
                 .accessibilityIdentifier("codexbar.login-openai.toolbar")
 
                 Button {
@@ -637,7 +641,7 @@ struct MenuBarView: View {
     private var openAIAccountsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text("OpenAI Accounts")
+                Text(L.openAIAccountsTitle)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -674,9 +678,9 @@ struct MenuBarView: View {
 
             if store.accounts.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("No OpenAI account added.")
+                    Text(L.noOpenAIAccountAdded)
                         .font(.system(size: 11, weight: .medium))
-                    Text("Use the toolbar plus button to add OpenAI OAuth accounts.")
+                    Text(L.openAIAccountsAddHint)
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
@@ -687,15 +691,20 @@ struct MenuBarView: View {
                         .fill(Color.secondary.opacity(0.06))
                 )
             } else {
-                AdaptiveMenuScrollContainer(
-                    initialHeight: openAIAccountsInitialHeight,
-                    measuredHeight: {
-                        openAIAccountGroupsView(visibleGroupedAccounts)
+                if self.shouldScrollOpenAIAccounts {
+                    AdaptiveMenuScrollContainer(
+                        initialHeight: openAIAccountsInitialHeight,
+                        measuredHeight: {
+                            openAIAccountGroupsView(visibleGroupedAccounts)
+                        }
+                    ) {
+                        openAIAccountGroupsView(groupedAccounts)
                     }
-                ) {
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
                     openAIAccountGroupsView(groupedAccounts)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -709,7 +718,7 @@ struct MenuBarView: View {
                     isProvidersExpanded.toggle()
                 } label: {
                     HStack(spacing: 6) {
-                        Text("Providers")
+                        Text(L.providersTitle)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundColor(.secondary)
 
@@ -737,7 +746,9 @@ struct MenuBarView: View {
                             isActiveProvider: store.activeProvider?.id == provider.id,
                             activeAccountId: provider.activeAccountId
                         ) { account in
-                            activateCompatibleProvider(providerID: provider.id, accountID: account.id)
+                            Task {
+                                await activateCompatibleProvider(providerID: provider.id, accountID: account.id)
+                            }
                         } onAddAccount: {
                             openAddProviderAccountWindow(provider: provider)
                         } onDeleteAccount: { account in
@@ -944,7 +955,7 @@ struct MenuBarView: View {
                     reason: .manual,
                     automatic: false,
                     forced: false,
-                    closeExistingCodexApps: false
+                    closeExistingCodexApps: true
                 )
             }
 
@@ -959,13 +970,29 @@ struct MenuBarView: View {
         }
     }
 
-    private func activateCompatibleProvider(providerID: String, accountID: String) {
+    private func activateCompatibleProvider(providerID: String, accountID: String) async {
+        let previousProviderID = self.store.config.active.providerId
+        let previousAccountID = self.store.config.active.accountId
+
         do {
-            try store.activateCustomProvider(providerID: providerID, accountID: accountID)
-            store.refreshLocalCostSummary()
-            showError = nil
+            try await self.switchCompatibleProviderAndLaunchNewInstance(
+                providerID: providerID,
+                accountID: accountID,
+                closeExistingCodexApps: true
+            )
+
+            self.store.refreshLocalCostSummary()
+            self.refreshRunningThreadAttribution()
+            self.showError = nil
         } catch {
-            showError = error.localizedDescription
+            if self.store.config.active.providerId != previousProviderID ||
+                self.store.config.active.accountId != previousAccountID {
+                try? self.store.restoreActiveSelection(
+                    providerID: previousProviderID,
+                    accountID: previousAccountID
+                )
+            }
+            self.showError = error.localizedDescription
         }
     }
 
@@ -1099,7 +1126,7 @@ struct MenuBarView: View {
     private func openAddProviderWindow() {
         DetachedWindowPresenter.shared.show(
             id: "add-provider",
-            title: "Add Provider",
+            title: L.addProviderTitle,
             size: CGSize(width: 420, height: 320)
         ) {
             AddProviderSheet { label, baseURL, accountLabel, apiKey in
@@ -1119,7 +1146,7 @@ struct MenuBarView: View {
     private func openAddProviderAccountWindow(provider: CodexBarProvider) {
         DetachedWindowPresenter.shared.show(
             id: "add-provider-account-\(provider.id)",
-            title: "Add Account",
+            title: L.addAccount,
             size: CGSize(width: 400, height: 220)
         ) {
             AddProviderAccountSheet(provider: provider) { label, apiKey in
@@ -1198,7 +1225,7 @@ struct MenuBarView: View {
         if outcomes.contains(.updated) || outcomes.contains(.skipped) {
             return failures.first
         }
-        return failures.first ?? "Refresh failed."
+        return failures.first ?? L.refreshFailed
     }
 
     private func refreshFailureMessage(for account: TokenAccount, outcome: WhamRefreshOutcome) -> String? {
@@ -1267,6 +1294,40 @@ struct MenuBarView: View {
         }
     }
 
+    private func switchCompatibleProviderAndLaunchNewInstance(
+        providerID: String,
+        accountID: String,
+        closeExistingCodexApps: Bool
+    ) async throws {
+        let previousProviderID = self.store.config.active.providerId
+        let previousAccountID = self.store.config.active.accountId
+        let existingCodexPIDs = Set(
+            closeExistingCodexApps
+                ? self.codexDesktopLaunchProbeService.runningCodexApplications().map(\.processIdentifier)
+                : []
+        )
+
+        do {
+            try self.store.activateCustomProvider(providerID: providerID, accountID: accountID)
+
+            if closeExistingCodexApps {
+                await self.codexDesktopLaunchProbeService.terminateApplicationsAndWait(
+                    withProcessIdentifiers: existingCodexPIDs
+                )
+            }
+
+            _ = try await self.codexDesktopLaunchProbeService.launchNewInstance()
+        } catch {
+            if previousProviderID != providerID || previousAccountID != accountID {
+                try? self.store.restoreActiveSelection(
+                    providerID: previousProviderID,
+                    accountID: previousAccountID
+                )
+            }
+            throw error
+        }
+    }
+
     private func refreshRunningThreadAttribution() {
         // Runtime sqlite scans stay off-main so the menu keeps responding while
         // polling short-window thread activity from Codex App / CLI / subagents.
@@ -1297,18 +1358,18 @@ private struct AddProviderSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add Provider")
+            Text(L.addProviderTitle)
                 .font(.headline)
 
-            TextField("Provider name", text: $label)
-            TextField("Base URL", text: $baseURL)
-            TextField("Account label", text: $accountLabel)
-            SecureField("API key", text: $apiKey)
+            TextField(L.providerNamePlaceholder, text: $label)
+            TextField(L.baseURLPlaceholder, text: $baseURL)
+            TextField(L.accountLabelPlaceholder, text: $accountLabel)
+            SecureField(L.apiKeyPlaceholder, text: $apiKey)
 
             HStack {
                 Spacer()
-                Button("Cancel", action: onCancel)
-                Button("Save") {
+                Button(L.cancel, action: onCancel)
+                Button(L.save) {
                     onSave(label, baseURL, accountLabel, apiKey)
                 }
                 .buttonStyle(.borderedProminent)
@@ -1329,16 +1390,16 @@ private struct AddProviderAccountSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add Account · \(provider.label)")
+            Text(L.addAccountForProviderTitle(provider.label))
                 .font(.headline)
 
-            TextField("Account label", text: $label)
-            SecureField("API key", text: $apiKey)
+            TextField(L.accountLabelPlaceholder, text: $label)
+            SecureField(L.apiKeyPlaceholder, text: $apiKey)
 
             HStack {
                 Spacer()
-                Button("Cancel", action: onCancel)
-                Button("Save") {
+                Button(L.cancel, action: onCancel)
+                Button(L.save) {
                     onSave(label, apiKey)
                 }
                 .buttonStyle(.borderedProminent)

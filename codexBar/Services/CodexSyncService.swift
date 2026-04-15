@@ -145,9 +145,9 @@ struct CodexSyncService: CodexSynchronizing {
         provider: CodexBarProvider
     ) -> String {
         var text = existingText
-        let modelProviderValue = "\"openai\""
+        let modelProviderKey = "openai"
 
-        text = self.upsertSetting(text, key: "model_provider", value: modelProviderValue)
+        text = self.upsertSetting(text, key: "model_provider", value: self.quote(modelProviderKey))
         text = self.upsertSetting(text, key: "model", value: self.quote(global.defaultModel))
         text = self.upsertSetting(text, key: "review_model", value: self.quote(global.reviewModel))
         text = self.upsertSetting(text, key: "model_reasoning_effort", value: self.quote(global.reasoningEffort))
@@ -162,6 +162,7 @@ struct CodexSyncService: CodexSynchronizing {
         text = self.removeSetting(text, key: "preferred_auth_method")
         text = self.removeBlock(text, key: "OpenAI")
         text = self.removeBlock(text, key: "openai")
+        text = self.removeManagedCompatibleProviderBlocks(text)
 
         if provider.kind == .openAIOAuth,
            config.openAI.accountUsageMode == .aggregateGateway {
@@ -205,6 +206,14 @@ struct CodexSyncService: CodexSynchronizing {
 
     private func removeBlock(_ text: String, key: String) -> String {
         guard let regex = try? NSRegularExpression(pattern: #"(?ms)^\[model_providers\.#(key)\]\n.*?(?=^\[|\Z)"#.replacingOccurrences(of: "#(key)", with: NSRegularExpression.escapedPattern(for: key))) else {
+            return text
+        }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
+    }
+
+    private func removeManagedCompatibleProviderBlocks(_ text: String) -> String {
+        guard let regex = try? NSRegularExpression(pattern: #"(?ms)^\[model_providers\.codexbar-[^\]\n]+\]\n.*?(?=^\[|\Z)"#) else {
             return text
         }
         let range = NSRange(text.startIndex..., in: text)

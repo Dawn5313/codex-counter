@@ -8,7 +8,7 @@ struct CostSummaryRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Cost")
+                Text(L.costTitle)
                     .font(.system(size: 12, weight: .semibold))
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -16,12 +16,12 @@ struct CostSummaryRowView: View {
                     .foregroundColor(.secondary)
             }
 
-            Text("Today: \(currency(summary.todayCostUSD)) · \(compactTokens(summary.todayTokens)) tokens")
+            Text(L.costTodaySummary(currency(summary.todayCostUSD), compactTokens(summary.todayTokens)))
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .lineLimit(1)
 
-            Text("Last 30 days: \(currency(summary.last30DaysCostUSD)) · \(compactTokens(summary.last30DaysTokens)) tokens")
+            Text(L.costLast30Summary(currency(summary.last30DaysCostUSD), compactTokens(summary.last30DaysTokens)))
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
                 .lineLimit(1)
@@ -122,14 +122,14 @@ struct CostDetailsPanelView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            metricRow(title: "Today", cost: summary.todayCostUSD, tokens: summary.todayTokens)
-            metricRow(title: "Last 30 Days", cost: summary.last30DaysCostUSD, tokens: summary.last30DaysTokens)
-            metricRow(title: "All-Time", cost: summary.lifetimeCostUSD, tokens: summary.lifetimeTokens)
+            metricRow(title: L.costMetricToday, cost: summary.todayCostUSD, tokens: summary.todayTokens)
+            metricRow(title: L.costMetricLast30Days, cost: summary.last30DaysCostUSD, tokens: summary.last30DaysTokens)
+            metricRow(title: L.costMetricAllTime, cost: summary.lifetimeCostUSD, tokens: summary.lifetimeTokens)
 
             Divider()
 
             if points.isEmpty {
-                Text("No cost history data.")
+                Text(L.costNoHistory)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             } else {
@@ -187,7 +187,7 @@ struct CostDetailsPanelView: View {
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.secondary)
-                Text("\(compactTokens(tokens)) tokens")
+                Text(L.tokenCount(compactTokens(tokens)))
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
             }
@@ -201,13 +201,13 @@ struct CostDetailsPanelView: View {
         if let point = selectedPoint {
             return "\(shortDay(point.date)) · \(currency(point.costUSD))"
         }
-        return "Last 30 days trend"
+        return L.costTrendTitle
     }
 
     private func secondaryDetailText() -> String {
         if let point = selectedPoint {
-            return "\(compactTokens(point.totalTokens)) tokens"
+            return L.tokenCount(compactTokens(point.totalTokens))
         }
-        return "Hover bars for daily details"
+        return L.costHoverHint
     }
 }

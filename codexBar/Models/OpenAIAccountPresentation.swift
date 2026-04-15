@@ -42,7 +42,7 @@ enum OpenAIAccountPresentation {
         let normalizedPlanType = self.normalizedPlanType(for: account)
 
         guard normalizedPlanType == "team" else {
-            return account.planType.uppercased()
+            return L.planBadgeTitle(account.planType)
         }
 
         if isHovered,
@@ -50,7 +50,7 @@ enum OpenAIAccountPresentation {
             return organizationName
         }
 
-        return "TEAM"
+        return L.planBadgeTitle(normalizedPlanType)
     }
 
     static func rowState(

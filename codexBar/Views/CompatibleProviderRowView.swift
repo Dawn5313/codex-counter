@@ -69,7 +69,7 @@ struct CompatibleProviderRowView: View {
                         .lineLimit(1)
 
                     if account.id != activeAccountId || isActiveProvider == false {
-                        Button("Use") {
+                        Button(L.useBtn) {
                             onActivate(account)
                         }
                         .buttonStyle(.borderedProminent)

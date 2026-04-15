@@ -8,11 +8,11 @@ enum LocalhostOAuthCallbackServerError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .socketCreationFailed:
-            return "Failed to create localhost OAuth callback socket."
+            return L.callbackServerSocketCreationFailed
         case .bindFailed(let code):
-            return "Failed to bind localhost OAuth callback listener (errno \(code))."
+            return L.callbackServerBindFailed(code)
         case .listenFailed(let code):
-            return "Failed to listen for localhost OAuth callback (errno \(code))."
+            return L.callbackServerListenFailed(code)
         }
     }
 }
@@ -113,7 +113,7 @@ final class LocalhostOAuthCallbackServer {
         let bytesRead = recv(clientFd, &buffer, buffer.count - 1, 0)
         guard bytesRead > 0,
               let request = String(bytes: buffer.prefix(bytesRead), encoding: .utf8) else {
-            self.write(response: Self.httpResponse(status: "400 Bad Request", body: "Invalid callback request."), to: clientFd)
+            self.write(response: Self.httpResponse(status: "400 Bad Request", body: L.callbackRequestInvalid), to: clientFd)
             return
         }
 
@@ -123,7 +123,7 @@ final class LocalhostOAuthCallbackServer {
             port: self.port,
             callbackPath: self.callbackPath
         ) else {
-            self.write(response: Self.httpResponse(status: "404 Not Found", body: "Callback route not found."), to: clientFd)
+            self.write(response: Self.httpResponse(status: "404 Not Found", body: L.callbackRouteNotFound), to: clientFd)
             return
         }
 
@@ -176,51 +176,53 @@ final class LocalhostOAuthCallbackServer {
         return data
     }
 
-    private static let successResponse = LocalhostOAuthCallbackServer.httpResponse(
-        status: "200 OK",
-        body: """
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>Codexbar Login Received</title>
-          <style>
-            body {
-              margin: 0;
-              min-height: 100vh;
-              display: grid;
-              place-items: center;
-              background: #111;
-              color: #f5f5f5;
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            }
-            .card {
-              width: min(92vw, 420px);
-              padding: 28px 24px;
-              border-radius: 18px;
-              background: #1b1b1b;
-              border: 1px solid #2c2c2c;
-              box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
-            }
-            h1 {
-              margin: 0 0 10px;
-              font-size: 22px;
-            }
-            p {
-              margin: 0;
-              color: #b7b7b7;
-              line-height: 1.5;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>Login received</h1>
-            <p>Codexbar captured the localhost callback. You can return to the app now.</p>
-          </div>
-        </body>
-        </html>
-        """
-    )
+    private static var successResponse: Data {
+        LocalhostOAuthCallbackServer.httpResponse(
+            status: "200 OK",
+            body: """
+            <!DOCTYPE html>
+            <html lang="\(L.zh ? "zh-CN" : "en")">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>\(L.callbackHTMLTitle)</title>
+              <style>
+                body {
+                  margin: 0;
+                  min-height: 100vh;
+                  display: grid;
+                  place-items: center;
+                  background: #111;
+                  color: #f5f5f5;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                }
+                .card {
+                  width: min(92vw, 420px);
+                  padding: 28px 24px;
+                  border-radius: 18px;
+                  background: #1b1b1b;
+                  border: 1px solid #2c2c2c;
+                  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+                }
+                h1 {
+                  margin: 0 0 10px;
+                  font-size: 22px;
+                }
+                p {
+                  margin: 0;
+                  color: #b7b7b7;
+                  line-height: 1.5;
+                }
+              </style>
+            </head>
+            <body>
+              <div class="card">
+                <h1>\(L.callbackHTMLHeading)</h1>
+                <p>\(L.callbackHTMLBody)</p>
+              </div>
+            </body>
+            </html>
+            """
+        )
+    }
 }

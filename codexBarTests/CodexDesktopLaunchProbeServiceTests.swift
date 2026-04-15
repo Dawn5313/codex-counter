@@ -230,6 +230,31 @@ final class CodexDesktopLaunchProbeServiceTests: CodexBarTestCase {
         XCTAssertEqual(capturedEnvironment["no_proxy"], "127.0.0.1,localhost,::1")
     }
 
+    func testWaitForApplicationsToTerminateReturnsAfterProcessesExit() async throws {
+        var runningProcessIdentifiers: Set<pid_t> = [101, 202]
+
+        let service = CodexDesktopLaunchProbeService(
+            locateCodexApp: { nil },
+            launchApp: { _, _ in nil },
+            processIsRunning: { processIdentifier in
+                runningProcessIdentifiers.contains(processIdentifier)
+            }
+        )
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            runningProcessIdentifiers.removeAll()
+        }
+
+        await service.waitForApplicationsToTerminate(
+            withProcessIdentifiers: runningProcessIdentifiers,
+            timeout: 1,
+            pollIntervalNanoseconds: 1_000_000
+        )
+
+        XCTAssertTrue(runningProcessIdentifiers.isEmpty)
+    }
+
     private func makeFakeCodexApp(
         name: String = "Codex",
         appName: String = "Codex.app"

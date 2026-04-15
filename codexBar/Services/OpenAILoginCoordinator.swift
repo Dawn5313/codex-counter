@@ -65,8 +65,8 @@ final class OpenAILoginCoordinator {
                     userInfo: [
                         "active": completion.active,
                         "message": completion.active
-                            ? "Updated Codex configuration. Changes apply to new sessions."
-                            : "Saved OpenAI account.",
+                            ? L.openAIOAuthUpdatedConfig
+                            : L.openAIOAuthSavedAccount,
                     ]
                 )
             case .failure(let error):
@@ -94,7 +94,7 @@ final class OpenAILoginCoordinator {
     private func openWindow() {
         DetachedWindowPresenter.shared.show(
             id: Self.windowID,
-            title: "OpenAI OAuth",
+            title: L.openAIOAuthTitle,
             size: CGSize(width: 560, height: 420)
         ) {
             OpenAILoginWindowView()

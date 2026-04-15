@@ -2,17 +2,30 @@ import Foundation
 
 /// Bilingual string helper — detects system language at runtime, with user override.
 enum L {
+    private nonisolated static let sharedDefaultsSuite = "lzhl.codexAppBar"
+
+    private nonisolated static var sharedDefaults: UserDefaults? {
+        UserDefaults(suiteName: self.sharedDefaultsSuite)
+    }
+
     /// nil = follow system, true = force Chinese, false = force English
     nonisolated static var languageOverride: Bool? {
         get {
-            let d = UserDefaults.standard
-            guard d.object(forKey: "languageOverride") != nil else { return nil }
-            return d.bool(forKey: "languageOverride")
+            if let sharedDefaults = self.sharedDefaults,
+               sharedDefaults.object(forKey: "languageOverride") != nil {
+                return sharedDefaults.bool(forKey: "languageOverride")
+            }
+
+            let standardDefaults = UserDefaults.standard
+            guard standardDefaults.object(forKey: "languageOverride") != nil else { return nil }
+            return standardDefaults.bool(forKey: "languageOverride")
         }
         set {
             if let v = newValue {
+                self.sharedDefaults?.set(v, forKey: "languageOverride")
                 UserDefaults.standard.set(v, forKey: "languageOverride")
             } else {
+                self.sharedDefaults?.removeObject(forKey: "languageOverride")
                 UserDefaults.standard.removeObject(forKey: "languageOverride")
             }
         }
@@ -225,11 +238,11 @@ enum L {
     static var noOpenAIAccountsForOrdering: String { zh ? "当前没有可排序的 OpenAI 账号。" : "There are no OpenAI accounts to reorder." }
     static var moveUp: String { zh ? "上移" : "Move Up" }
     static var moveDown: String { zh ? "下移" : "Move Down" }
-    static var manualActivationBehaviorTitle: String { zh ? "手动点击 OpenAI 账号时" : "When Manually Clicking an OpenAI Account" }
+    static var manualActivationBehaviorTitle: String { zh ? "手动切换账号或 Provider 时" : "When Manually Switching an Account or Provider" }
     static var manualActivationBehaviorHint: String {
         zh
-            ? "只影响 OpenAI OAuth 账号的手动点击，不会扩展到 custom provider。"
-            : "This only affects manual clicks on OpenAI OAuth accounts and does not extend to custom providers."
+            ? "用于手动切换 OpenAI OAuth 账号和自定义 provider 账号。可只改配置，或在切换后立即拉起新的 Codex 实例。"
+            : "Controls manual switching for both OpenAI OAuth accounts and custom provider accounts. You can update the config only, or launch a new Codex instance immediately after switching."
     }
     static var manualActivationUpdateConfigOnly: String { zh ? "仅修改配置" : "Update Config Only" }
     static var manualActivationUpdateConfigOnlyHint: String {
@@ -412,5 +425,162 @@ enum L {
     }
     static func resetInDay(_ d: Int, _ h: Int) -> String {
         zh ? "\(d) 天 \(h) 小时后重置" : "Resets in \(d)d \(h)h"
+    }
+
+    // MARK: - Additional UI
+    static func modelLabel(_ model: String) -> String {
+        zh ? "模型：\(model)" : "Model: \(model)"
+    }
+    static var emptyStateAddAccountOrProvider: String {
+        zh ? "添加 OpenAI 账号或创建自定义 provider。" : "Add an OpenAI account or create a custom provider."
+    }
+    static var loginToolbarButton: String {
+        zh ? "添加 OpenAI 账号" : "Add OpenAI account"
+    }
+    static var openAIAccountsTitle: String {
+        zh ? "OpenAI 账号" : "OpenAI Accounts"
+    }
+    static var noOpenAIAccountAdded: String {
+        zh ? "还没有添加 OpenAI 账号。" : "No OpenAI account added."
+    }
+    static var openAIAccountsAddHint: String {
+        zh ? "点击下方工具栏中的加号，添加 OpenAI OAuth 账号。" : "Use the toolbar plus button to add OpenAI OAuth accounts."
+    }
+    static var providersTitle: String {
+        zh ? "提供商" : "Providers"
+    }
+    static var addProviderTitle: String {
+        zh ? "添加 Provider" : "Add Provider"
+    }
+    static var providerNamePlaceholder: String {
+        zh ? "Provider 名称" : "Provider name"
+    }
+    static var baseURLPlaceholder: String {
+        zh ? "接口 Base URL" : "Base URL"
+    }
+    static var accountLabelPlaceholder: String {
+        zh ? "账号标签" : "Account label"
+    }
+    static var apiKeyPlaceholder: String {
+        zh ? "API Key" : "API key"
+    }
+    static func addAccountForProviderTitle(_ provider: String) -> String {
+        zh ? "添加账号 · \(provider)" : "Add Account · \(provider)"
+    }
+    static var refreshFailed: String {
+        zh ? "刷新失败。" : "Refresh failed."
+    }
+    static var openAILoginFailed: String {
+        zh ? "OpenAI 登录失败。" : "OpenAI login failed."
+    }
+    static var openAIOAuthTitle: String {
+        zh ? "OpenAI 授权" : "OpenAI OAuth"
+    }
+    static var openAIOAuthStep1: String {
+        zh ? "1. 在浏览器中打开授权链接。" : "1. Open the authorization link in your browser."
+    }
+    static var openAIOAuthStep2: String {
+        zh ? "2. 完成授权。" : "2. Finish authorization."
+    }
+    static var openAIOAuthStep3: String {
+        zh
+            ? "3. 当此窗口保持打开时，Codexbar 会自动捕获 `http://localhost:1455/auth/callback?...`。如果自动捕获失败，请把完整 URL 粘贴到这里，也可以只粘贴 `code` 值。"
+            : "3. Codexbar will auto-capture `http://localhost:1455/auth/callback?...` while this window is open. If automatic capture fails, paste the full URL here. You can also paste just the `code` value."
+    }
+    static var authorizationLinkNotReady: String {
+        zh ? "授权链接尚未准备好。" : "Authorization link not ready."
+    }
+    static var openBrowser: String {
+        zh ? "打开浏览器" : "Open Browser"
+    }
+    static var copyLink: String {
+        zh ? "复制链接" : "Copy Link"
+    }
+    static var copyLoginLink: String {
+        zh ? "复制登录链接" : "Copy Login Link"
+    }
+    static var oauthCallbackInputLabel: String {
+        zh ? "OAuth 回调输入" : "OAuth Callback Input"
+    }
+    static var oauthCallbackInputHint: String {
+        zh ? "在这里粘贴 localhost 回调 URL 或 OAuth code。" : "Paste the localhost callback URL or OAuth code here."
+    }
+    static var cancelLogin: String {
+        zh ? "取消登录" : "Cancel Login"
+    }
+    static var completeLogin: String {
+        zh ? "完成登录" : "Complete Login"
+    }
+    static var openAIOAuthUpdatedConfig: String {
+        zh ? "已更新 Codex 配置，新会话会使用最新设置。" : "Updated Codex configuration. Changes apply to new sessions."
+    }
+    static var openAIOAuthSavedAccount: String {
+        zh ? "已保存 OpenAI 账号。" : "Saved OpenAI account."
+    }
+    static var callbackServerSocketCreationFailed: String {
+        zh ? "创建 localhost OAuth 回调 socket 失败。" : "Failed to create localhost OAuth callback socket."
+    }
+    static func callbackServerBindFailed(_ code: Int32) -> String {
+        zh ? "绑定 localhost OAuth 回调监听失败（errno \(code)）。" : "Failed to bind localhost OAuth callback listener (errno \(code))."
+    }
+    static func callbackServerListenFailed(_ code: Int32) -> String {
+        zh ? "启动 localhost OAuth 回调监听失败（errno \(code)）。" : "Failed to listen for localhost OAuth callback (errno \(code))."
+    }
+    static var callbackRequestInvalid: String {
+        zh ? "无效的回调请求。" : "Invalid callback request."
+    }
+    static var callbackRouteNotFound: String {
+        zh ? "未找到回调路由。" : "Callback route not found."
+    }
+    static var callbackHTMLTitle: String {
+        zh ? "Codexbar 已接收登录回调" : "Codexbar Login Received"
+    }
+    static var callbackHTMLHeading: String {
+        zh ? "已接收登录回调" : "Login received"
+    }
+    static var callbackHTMLBody: String {
+        zh ? "Codexbar 已捕获 localhost 回调。现在可以回到应用继续了。" : "Codexbar captured the localhost callback. You can return to the app now."
+    }
+    static var costTitle: String {
+        zh ? "成本" : "Cost"
+    }
+    static func costTodaySummary(_ cost: String, _ tokens: String) -> String {
+        zh ? "今日：\(cost) · \(tokens) 令牌" : "Today: \(cost) · \(tokens) tokens"
+    }
+    static func costLast30Summary(_ cost: String, _ tokens: String) -> String {
+        zh ? "近 30 天：\(cost) · \(tokens) 令牌" : "Last 30 days: \(cost) · \(tokens) tokens"
+    }
+    static var costMetricToday: String {
+        zh ? "今日" : "Today"
+    }
+    static var costMetricLast30Days: String {
+        zh ? "近 30 天" : "Last 30 Days"
+    }
+    static var costMetricAllTime: String {
+        zh ? "累计" : "All-Time"
+    }
+    static var costNoHistory: String {
+        zh ? "暂无成本历史数据。" : "No cost history data."
+    }
+    static func tokenCount(_ count: String) -> String {
+        zh ? "\(count) 令牌" : "\(count) tokens"
+    }
+    static var costTrendTitle: String {
+        zh ? "近 30 天趋势" : "Last 30 days trend"
+    }
+    static var costHoverHint: String {
+        zh ? "悬停柱状图查看每日详情" : "Hover bars for daily details"
+    }
+    static func planBadgeTitle(_ planType: String) -> String {
+        let normalized = planType.lowercased()
+        if zh {
+            switch normalized {
+            case "free": return "免费"
+            case "plus": return "Plus"
+            case "team": return "团队"
+            default: return planType
+            }
+        }
+        return planType.uppercased()
     }
 }

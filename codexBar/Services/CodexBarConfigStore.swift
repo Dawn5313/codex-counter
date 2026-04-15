@@ -4,6 +4,7 @@ struct LegacyCodexTomlSnapshot {
     var model: String?
     var reviewModel: String?
     var reasoningEffort: String?
+    var modelProvider: String?
     var openAIBaseURL: String?
 }
 
@@ -374,11 +375,13 @@ final class CodexBarConfigStore {
         guard let text = try? String(contentsOf: CodexPaths.configTomlURL, encoding: .utf8) else {
             return LegacyCodexTomlSnapshot()
         }
+        let modelProvider = self.matchValue(for: "model_provider", in: text)
         return LegacyCodexTomlSnapshot(
             model: self.matchValue(for: "model", in: text),
             reviewModel: self.matchValue(for: "review_model", in: text),
             reasoningEffort: self.matchValue(for: "model_reasoning_effort", in: text),
-            openAIBaseURL: self.matchOpenAIBaseURL(in: text)
+            modelProvider: modelProvider,
+            openAIBaseURL: self.matchOpenAIBaseURL(in: text, modelProvider: modelProvider)
         )
     }
 
@@ -392,9 +395,14 @@ final class CodexBarConfigStore {
         return String(text[valueRange])
     }
 
-    private func matchOpenAIBaseURL(in text: String) -> String? {
+    private func matchOpenAIBaseURL(in text: String, modelProvider: String?) -> String? {
         if let explicitBaseURL = self.matchValue(for: "openai_base_url", in: text) {
             return explicitBaseURL
+        }
+
+        if let modelProvider,
+           let customBaseURL = self.matchBaseURLInProviderBlock(in: text, key: modelProvider) {
+            return customBaseURL
         }
 
         return self.matchBaseURLInProviderBlock(in: text, key: "OpenAI")

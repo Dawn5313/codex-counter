@@ -198,6 +198,47 @@ final class TokenStore: ObservableObject {
         try self.appendSwitchJournal(previousAccountID: previousAccountID)
     }
 
+    func restoreActiveSelection(providerID: String?, accountID: String?) throws {
+        guard let providerID else {
+            self.config.active.providerId = nil
+            self.config.active.accountId = nil
+            try self.persist(syncCodex: false)
+            return
+        }
+
+        guard let provider = self.config.providers.first(where: { $0.id == providerID }) else {
+            throw TokenStoreError.providerNotFound
+        }
+
+        switch provider.kind {
+        case .openAIOAuth:
+            if let accountID {
+                _ = try self.config.activateOAuthAccount(accountID: accountID)
+            } else {
+                self.config.active.providerId = provider.id
+                self.config.active.accountId = provider.activeAccountId
+            }
+        case .openAICompatible:
+            let resolvedAccountID = accountID ?? provider.activeAccountId
+            guard let resolvedAccountID else {
+                throw TokenStoreError.accountNotFound
+            }
+            guard var mutableProvider = self.config.providers.first(where: { $0.id == providerID && $0.kind == .openAICompatible }) else {
+                throw TokenStoreError.providerNotFound
+            }
+            guard mutableProvider.accounts.contains(where: { $0.id == resolvedAccountID }) else {
+                throw TokenStoreError.accountNotFound
+            }
+
+            mutableProvider.activeAccountId = resolvedAccountID
+            self.upsertProvider(mutableProvider)
+            self.config.active.providerId = mutableProvider.id
+            self.config.active.accountId = resolvedAccountID
+        }
+
+        try self.persist(syncCodex: true)
+    }
+
     func addCustomProvider(label: String, baseURL: String, accountLabel: String, apiKey: String) throws {
         let previousAccountID = self.config.active.accountId
         let trimmedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)

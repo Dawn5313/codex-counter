@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import Foundation
 
 struct CodexDesktopResolvedAppLocation: Equatable {
@@ -95,10 +96,14 @@ final class CodexDesktopLaunchProbeService {
     typealias PreferredAppPathProvider = @MainActor () -> String?
     typealias AppLocator = @MainActor () -> CodexDesktopResolvedAppLocation?
     typealias Launcher = @MainActor (_ appURL: URL, _ environment: [String: String]) async throws -> NSRunningApplication?
+    typealias ActiveEnvironmentProvider = @MainActor () -> [String: String]
+    typealias ProcessIsRunning = @MainActor (_ processIdentifier: pid_t) -> Bool
 
     private let preferredAppPathProvider: PreferredAppPathProvider
     private let locateCodexApp: AppLocator
     private let launchApp: Launcher
+    private let activeEnvironmentProvider: ActiveEnvironmentProvider
+    private let processIsRunning: ProcessIsRunning
     private let fileManager: FileManager
     private let environment: [String: String]
     private let now: () -> Date
@@ -110,6 +115,16 @@ final class CodexDesktopLaunchProbeService {
         },
         locateCodexApp: @escaping AppLocator = defaultCodexDesktopAppLocator,
         launchApp: @escaping Launcher = defaultCodexDesktopLauncher,
+        activeEnvironmentProvider: @escaping ActiveEnvironmentProvider = {
+            CodexDesktopLaunchProbeService.activeProviderEnvironment()
+        },
+        processIsRunning: @escaping ProcessIsRunning = { processIdentifier in
+            guard processIdentifier > 0 else { return false }
+            if kill(processIdentifier, 0) == 0 {
+                return true
+            }
+            return errno == EPERM
+        },
         fileManager: FileManager = .default,
         environment: [String: String] = ProcessInfo.processInfo.environment,
         now: @escaping () -> Date = Date.init,
@@ -118,6 +133,8 @@ final class CodexDesktopLaunchProbeService {
         self.preferredAppPathProvider = preferredAppPathProvider
         self.locateCodexApp = locateCodexApp
         self.launchApp = launchApp
+        self.activeEnvironmentProvider = activeEnvironmentProvider
+        self.processIsRunning = processIsRunning
         self.fileManager = fileManager
         self.environment = environment
         self.now = now
@@ -171,7 +188,7 @@ final class CodexDesktopLaunchProbeService {
         )
         try self.writeState(state)
 
-        var launchEnvironment = self.environment
+        var launchEnvironment = self.launchEnvironment()
         let currentPATH = launchEnvironment["PATH"] ?? ""
         let prefixedPATH = currentPATH.isEmpty
             ? CodexPaths.managedLaunchBinURL.path
@@ -190,7 +207,7 @@ final class CodexDesktopLaunchProbeService {
             throw CodexDesktopLaunchProbeError.codexAppNotFound
         }
 
-        var launchEnvironment = self.environment
+        var launchEnvironment = self.launchEnvironment()
         launchEnvironment.removeValue(forKey: "CODEXBAR_DESKTOP_PROBE_RUN_ID")
         launchEnvironment.removeValue(forKey: "CODEXBAR_DESKTOP_PROBE_HITS_DIR")
         launchEnvironment = Self.appendingLocalProxyBypass(to: launchEnvironment)
@@ -210,6 +227,35 @@ final class CodexDesktopLaunchProbeService {
             if application.terminate() == false {
                 _ = application.forceTerminate()
             }
+        }
+    }
+
+    func terminateApplicationsAndWait(
+        withProcessIdentifiers processIdentifiers: Set<pid_t>,
+        timeout: TimeInterval = 5,
+        pollIntervalNanoseconds: UInt64 = 100_000_000
+    ) async {
+        guard processIdentifiers.isEmpty == false else { return }
+
+        self.terminateApplications(withProcessIdentifiers: processIdentifiers)
+        await self.waitForApplicationsToTerminate(
+            withProcessIdentifiers: processIdentifiers,
+            timeout: timeout,
+            pollIntervalNanoseconds: pollIntervalNanoseconds
+        )
+    }
+
+    func waitForApplicationsToTerminate(
+        withProcessIdentifiers processIdentifiers: Set<pid_t>,
+        timeout: TimeInterval = 5,
+        pollIntervalNanoseconds: UInt64 = 100_000_000
+    ) async {
+        guard processIdentifiers.isEmpty == false else { return }
+
+        let deadline = Date().addingTimeInterval(max(timeout, 0))
+        while processIdentifiers.contains(where: { self.processIsRunning($0) }) {
+            guard Date() < deadline else { return }
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
         }
     }
 
@@ -326,6 +372,37 @@ final class CodexDesktopLaunchProbeService {
             .appendingPathComponent("Contents", isDirectory: true)
             .appendingPathComponent("Resources", isDirectory: true)
             .appendingPathComponent("codex")
+    }
+
+    private func launchEnvironment() -> [String: String] {
+        var environment = self.environment
+        environment.removeValue(forKey: "OPENAI_API_KEY")
+        environment.removeValue(forKey: "OPENAI_BASE_URL")
+
+        for (key, value) in self.activeEnvironmentProvider() {
+            environment[key] = value
+        }
+
+        return environment
+    }
+
+    private static func activeProviderEnvironment() -> [String: String] {
+        let store = TokenStore.shared
+        guard let provider = store.config.activeProvider(),
+              provider.kind == .openAICompatible,
+              let account = store.config.activeAccount(),
+              let apiKey = account.apiKey,
+              apiKey.isEmpty == false else {
+            return [:]
+        }
+
+        var environment: [String: String] = [
+            "OPENAI_API_KEY": apiKey,
+        ]
+        if let baseURL = provider.baseURL, baseURL.isEmpty == false {
+            environment["OPENAI_BASE_URL"] = baseURL
+        }
+        return environment
     }
 
     private func readHit(at url: URL) -> CodexDesktopLaunchProbeHit? {
