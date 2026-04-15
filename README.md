@@ -112,6 +112,13 @@
 
 当前仓库已经接入一份单一的 update feed，应用启动时会做非阻塞检查，菜单栏里也可以手动触发“检查更新”。
 
+## 下载
+
+当前仓库已经附带可直接下载的 macOS 安装包：
+
+- [ccodexr-1.2.0-macOS.dmg](./dist/v1.2.0/ccodexr-1.2.0-macOS.dmg)
+- [ccodexr-1.2.0-macOS.zip](./dist/v1.2.0/ccodexr-1.2.0-macOS.zip)
+
 但要特别说明当前边界：
 
 - 当前稳定版本默认仍是 **guided download / install**

@@ -2,37 +2,25 @@
   "schemaVersion": 1,
   "channel": "stable",
   "release": {
-    "version": "1.1.8",
-    "publishedAt": "2026-04-13T07:21:52Z",
-    "summary": "修正 Plus / Team 双窗口额度的恢复时间语义：7 天额度耗尽时优先显示 7d 重置时间，多个 exhausted window 时显示真正决定恢复可用性的更晚窗口，并同步修正 exhausted 账号排序；README 中英双语截图与界面说明同步更新。",
-    "releaseNotesURL": "https://github.com/Dawn5313/codex-counter/releases/tag/v1.1.8",
-    "downloadPageURL": "https://github.com/Dawn5313/codex-counter/releases/tag/v1.1.8",
+    "version": "1.2.0",
+    "publishedAt": "2026-04-15T14:30:00Z",
+    "summary": "将项目统一为 ccodexr 品牌，增强 provider 切换后的对话续接稳定性，补齐本地成本统计明细与今日趋势展示，并修正状态栏 helper 刷新与多处边缘稳定性问题。",
+    "releaseNotesURL": "https://github.com/Dawn5313/codex-counter/blob/main/docs/releases/v1.2.0.md",
+    "downloadPageURL": "https://github.com/Dawn5313/codex-counter/tree/main/dist/v1.2.0",
     "deliveryMode": "guidedDownload",
     "minimumAutomaticUpdateVersion": "1.1.6",
     "artifacts": [
       {
         "architecture": "universal",
         "format": "dmg",
-        "downloadURL": "https://github.com/Dawn5313/codex-counter/releases/download/v1.1.8/ccodexr-1.1.8-macOS.dmg",
-        "sha256": "27f98b380969f281d1157d6a2a03a38a98567a45a6862848ca74659691ab1028"
+        "downloadURL": "https://raw.githubusercontent.com/Dawn5313/codex-counter/main/dist/v1.2.0/ccodexr-1.2.0-macOS.dmg",
+        "sha256": "aae87182ff446a796b8ec4118a450d6adaab65c95c8ce330aa2f2108c255087e"
       },
       {
         "architecture": "universal",
         "format": "zip",
-        "downloadURL": "https://github.com/Dawn5313/codex-counter/releases/download/v1.1.8/ccodexr-1.1.8-macOS.zip",
-        "sha256": "1b411e51faf9f3eb235a7326771a8f04a278525a74551c5e54d6efebf1a7fe81"
-      },
-      {
-        "architecture": "x86_64",
-        "format": "dmg",
-        "downloadURL": "https://github.com/Dawn5313/codex-counter/releases/download/v1.1.8/ccodexr-1.1.8-macOS-intel.dmg",
-        "sha256": "d31a61dd2b75cc3ae6320546e7e69b3d4c71867deef2745ffed7ab6179851843"
-      },
-      {
-        "architecture": "x86_64",
-        "format": "zip",
-        "downloadURL": "https://github.com/Dawn5313/codex-counter/releases/download/v1.1.8/ccodexr-1.1.8-macOS-intel.zip",
-        "sha256": "d1361c8ebed4365c7156ef4f9a9d9d091d374c90e604db321c47b570c8cbc922"
+        "downloadURL": "https://raw.githubusercontent.com/Dawn5313/codex-counter/main/dist/v1.2.0/ccodexr-1.2.0-macOS.zip",
+        "sha256": "47b2a55b2462236c9e05281e6e6ef0ab6a9c63c1ab7fdada648daa91a01f3d8e"
       }
     ]
   }
